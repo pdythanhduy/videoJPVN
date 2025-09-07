@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+// Local STT (no API)
+let localTranscribePipeline = null;
+import { Link } from 'react-router-dom';
 import * as wanakana from 'wanakana';
 import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon } from "lucide-react";
 import "./App.css";
@@ -220,8 +223,14 @@ function secondsToTimestamp(s) {
 
 export default function JPVideoSubApp() {
   const videoRef = useRef(null);
+  const wrapperRef = useRef(null);
   const [data, setData] = useState(() => normalizeData(DEMO_DATA));
   const [videoURL, setVideoURL] = useState(null);
+  const [imageURL, setImageURL] = useState(null);
+  const bgImageRef = useRef(null);
+  const audioMainRef = useRef(null);
+  const [audioMainURL, setAudioMainURL] = useState(null);
+  const [mediaDuration, setMediaDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [demo, setDemo] = useState(true); // Demo Mode: mô phỏng thời gian nếu chưa có video
   const [simTime, setSimTime] = useState(0);
@@ -231,18 +240,30 @@ export default function JPVideoSubApp() {
   const [posColors, setPosColors] = useState({ ...DEFAULT_POS_COLORS });
   const [rate, setRate] = useState(1);
   const [opacity, setOpacity] = useState(0.92);
-  const [highlightOffset, setHighlightOffset] = useState(-0.22); // seconds, positive = highlight later
-  const [subFontSize, setSubFontSize] = useState(12); // px
+  const [highlightOffset, setHighlightOffset] = useState(-0.5); // seconds, positive = highlight later
+  const [subFontSize, setSubFontSize] = useState(16); // px
   const [subOffsetY, setSubOffsetY] = useState(-24); // px, positive moves down
   const [recording, setRecording] = useState(false);
   const tokenizerRef = useRef(null);
   const [autoReading, setAutoReading] = useState(true);
   const [tokenizerReady, setTokenizerReady] = useState(false);
   const [lastLoadedFromSrt, setLastLoadedFromSrt] = useState(false);
-  const [tokenLead, setTokenLead] = useState(-0.06); // seconds: advance token highlight
+  const [tokenLead, setTokenLead] = useState(-0.1); // seconds: advance token highlight
   const [segOffsets, setSegOffsets] = useState({}); // per-segment fine offsets in seconds
-  const [subCentered, setSubCentered] = useState(false);
-  const [punctSkip, setPunctSkip] = useState(0.03); // seconds to skip into next token when inside punctuation
+  const [subCentered, setSubCentered] = useState(true);
+  const [punctSkip, setPunctSkip] = useState(0.06); // seconds to skip into next token when inside punctuation
+  const [highlightEnabled, setHighlightEnabled] = useState(true);
+  const [showVocabTop, setShowVocabTop] = useState(false);
+
+  // STT (Audio -> SRT)
+  const [sttOpen, setSttOpen] = useState(false);
+  const [sttApiKey, setSttApiKey] = useState('');
+  const [sttModel, setSttModel] = useState('whisper-1');
+  const [sttApiBase, setSttApiBase] = useState('https://api.openai.com');
+  const [sttAudioFile, setSttAudioFile] = useState(null);
+  const [sttLoading, setSttLoading] = useState(false);
+  const [sttResult, setSttResult] = useState('');
+  const [sttError, setSttError] = useState('');
 
   // Build kuromoji tokenizer once (dynamic import to avoid bundling issues)
   useEffect(() => {
@@ -283,9 +304,9 @@ export default function JPVideoSubApp() {
   // Tính tổng thời lượng demo từ segment cuối
   const demoDuration = useMemo(() => (data?.segments?.at(-1)?.end ?? 15), [data]);
 
-  // Đồng bộ thời gian: video thực vs demo (frame-accurate nếu có)
+  // Đồng bộ thời gian: ưu tiên audio nếu có; nếu không có audio thì dùng video (frame-accurate nếu có)
   useEffect(() => {
-    if (!demo && videoRef.current) {
+    if (!demo && videoRef.current && !audioMainURL) {
       const vid = videoRef.current;
       let rafId = 0; let running = true;
       const onFrame = (_now, metadata) => {
@@ -305,7 +326,55 @@ export default function JPVideoSubApp() {
       }
       return () => { running = false; if (rafId) cancelAnimationFrame(rafId); };
     }
-  }, [demo]);
+  }, [demo, audioMainURL]);
+
+  // When audio ends during normal playback, stop everything (video, state)
+  useEffect(() => {
+    const a = audioMainRef.current;
+    if (!a) return;
+    const onEnded = () => {
+      setPlaying(false);
+      const vid = videoRef.current;
+      if (vid) { try { vid.pause(); } catch {} }
+    };
+    a.addEventListener('ended', onEnded);
+    return () => { a.removeEventListener('ended', onEnded); };
+  }, [audioMainURL]);
+
+  // Khi có audio, luôn drive simTime từ audio (kể cả khi có video)
+  useEffect(() => {
+    const a = audioMainRef.current;
+    if (!a) return;
+    let raf = 0; let running = true;
+    const step = () => {
+      if (!running) return;
+      setSimTime(isFinite(a.currentTime) ? a.currentTime : 0);
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { running = false; if (raf) cancelAnimationFrame(raf); };
+  }, [audioMainURL, videoURL]);
+
+  // Đồng bộ video theo audio khi cả hai cùng tồn tại (để video lặp theo audio)
+  useEffect(() => {
+    if (demo) return;
+    const a = audioMainRef.current;
+    const vid = videoRef.current;
+    if (!a || !vid) return;
+    let raf = 0; let running = true;
+    const step = () => {
+      if (!running) return;
+      const dur = isFinite(vid.duration) ? vid.duration : 0;
+      if (dur > 0) {
+        const desired = (a.currentTime % dur);
+        const diff = Math.abs((vid.currentTime || 0) - desired);
+        if (diff > 0.05) { try { vid.currentTime = desired; } catch {} }
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { running = false; if (raf) cancelAnimationFrame(raf); };
+  }, [demo, audioMainURL, videoURL]);
 
   // Tick Demo
   useEffect(() => {
@@ -379,9 +448,90 @@ export default function JPVideoSubApp() {
     return currentSeg.tokens[currentTokenIndex] || null;
   }, [currentSeg, currentTokenIndex]);
 
+  // ===== Vocab list (JP–VI) for current segment =====
+  const vocabEntries = useMemo(() => {
+    const entries = [];
+    const seen = new Set();
+    const seg = currentSeg;
+    if (!seg) return entries;
+    for (const tk of (seg.tokens || [])) {
+      const pos = String(tk?.pos || '').toUpperCase();
+      if (pos !== 'NOUN' && pos !== 'PROPN') continue;
+      const surface = String(tk?.surface || '').trim();
+      if (!surface || seen.has(surface)) continue;
+      seen.add(surface);
+      entries.push({
+        surface,
+        reading: String(tk?.reading || '').trim(),
+        vi: String(tk?.vi || '').trim(),
+      });
+    }
+    return entries;
+  }, [currentSeg]);
+
+  function downloadVocabCsv() {
+    try {
+      const lines = ['JP,Reading,VI'];
+      for (const it of vocabEntries) {
+        const jp = (it.surface || '').replaceAll('"', '""');
+        const rd = (it.reading || '').replaceAll('"', '""');
+        const vi = (it.vi || '').replaceAll('"', '""');
+        lines.push(`"${jp}","${rd}","${vi}"`);
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'vocab.csv';
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+    } catch {}
+  }
+
+  async function copyVocabCsv() {
+    try {
+      const lines = ['JP,Reading,VI'];
+      for (const it of vocabEntries) {
+        const jp = (it.surface || '').replaceAll('"', '""');
+        const rd = (it.reading || '').replaceAll('"', '""');
+        const vi = (it.vi || '').replaceAll('"', '""');
+        lines.push(`"${jp}","${rd}","${vi}"`);
+      }
+      await navigator.clipboard.writeText(lines.join('\n'));
+      alert('Đã copy CSV từ vựng vào clipboard');
+    } catch {}
+  }
+
   function handlePlayPause() {
+    const a = audioMainRef.current;
+    const isAudioMode = !videoURL && !!a;
+    if (isAudioMode) {
+      if (playing) { try { a.pause(); } catch {} setPlaying(false); }
+      else {
+        try { a.currentTime = Math.max(0, simTime); } catch {}
+        const p = a.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            alert('Trình duyệt chặn phát audio tự động. Hãy nhấn Play lần nữa sau khi tương tác.');
+          });
+        }
+        setPlaying(true);
+      }
+      return;
+    }
     if (demo) {
       setPlaying(p => !p);
+    } else if (a) {
+      // Prefer driving play/pause via audio when available
+      if (playing) { try { a.pause(); } catch {} setPlaying(false); }
+      else {
+        try { a.currentTime = Math.max(0, simTime); } catch {}
+        const p = a.play();
+        if (p && typeof p.catch === 'function') { p.catch(() => { alert('Trình duyệt chặn phát audio tự động. Hãy nhấn Play lần nữa.'); }); }
+        // ensure video plays muted & loop when audio exists
+        const vid = videoRef.current;
+        if (vid && videoURL) { try { vid.muted = true; vid.loop = true; vid.play(); } catch {} }
+        setPlaying(true);
+      }
     } else if (videoRef.current) {
       const vid = videoRef.current;
       if (vid.paused) { vid.play(); setPlaying(true); }
@@ -392,7 +542,7 @@ export default function JPVideoSubApp() {
   function onVideoFile(e) {
     const f = e.target.files?.[0]; if (!f) return;
     const url = URL.createObjectURL(f);
-    setVideoURL(url); setDemo(false); setPlaying(false); setSimTime(0);
+    setVideoURL(url); setImageURL(null); setDemo(false); setPlaying(false); setSimTime(0);
   }
 
   function onJsonFile(e) {
@@ -539,6 +689,21 @@ export default function JPVideoSubApp() {
     return { surface, reading, pos: 'OTHER' };
   }
 
+  // Extract vocabulary list (unique NOUN/PROPN) from a segment
+  function extractVocabList(seg) {
+    const out = [];
+    const seen = new Set();
+    const tokens = seg?.tokens || [];
+    for (const tk of tokens) {
+      const pos = String(tk?.pos || '').toUpperCase();
+      if (pos === 'NOUN' || pos === 'PROPN') {
+        const word = String(tk?.surface || '').trim();
+        if (word && !seen.has(word)) { seen.add(word); out.push(word); }
+      }
+    }
+    return out;
+  }
+
   function addTokenTimings(segment) {
     const tokens = segment.tokens || [];
     const dur = Math.max(0, (segment.end || 0) - (segment.start || 0));
@@ -600,12 +765,14 @@ export default function JPVideoSubApp() {
       t = seg.start + (seg.tokens[tokenIdx].t ?? 0);
     }
     if (demo) { setSimTime(t); }
-    else if (videoRef.current) { videoRef.current.currentTime = t; }
+    else if (videoRef.current && videoURL) { videoRef.current.currentTime = t; }
+    else if (audioMainRef.current && !videoURL) { try { audioMainRef.current.currentTime = t; } catch {} setSimTime(t); }
   }
 
   function setPlaybackRate(r) {
     setRate(r);
     if (videoRef.current) videoRef.current.playbackRate = r;
+    if (audioMainRef.current) { try { audioMainRef.current.playbackRate = r; } catch {} }
   }
 
   function formatSrtTimestamp(s) {
@@ -660,18 +827,52 @@ export default function JPVideoSubApp() {
 
   async function recordVideoWithSub() {
     const vid = videoRef.current;
-    if (!vid || !videoURL) { alert('Hãy chọn video trước.'); return; }
     if (!('MediaRecorder' in window)) { alert('Trình duyệt không hỗ trợ MediaRecorder.'); return; }
-    const width = vid.videoWidth || 1280;
-    const height = vid.videoHeight || 720;
+    // Determine source: video or image
+    const hasVideo = !!videoURL && vid;
+    let width = 1280, height = 720;
+    if (hasVideo) {
+      width = vid.videoWidth || width;
+      height = vid.videoHeight || height;
+    } else {
+      // fallback size for image (9:16 TikTok style)
+      width = 720; height = 1280;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d');
-    const stream = canvas.captureStream(30);
+    const canvasStream = canvas.captureStream(30);
+    let stream = canvasStream;
+    try {
+      // Prefer uploaded audio if present
+      if (audioMainRef.current) {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaElementSource(audioMainRef.current);
+        const dest = audioCtx.createMediaStreamDestination();
+        source.connect(dest);
+        // Do NOT connect to destination here to avoid echo in some browsers during recording
+        const audioTrack = dest.stream.getAudioTracks()[0];
+        if (audioTrack) stream = new MediaStream([...canvasStream.getVideoTracks(), audioTrack]);
+      } else if (hasVideo && typeof vid.captureStream === 'function') {
+        // Fallback: use video's own audio track if no uploaded audio
+        const mediaElStream = vid.captureStream();
+        const audioTracks = mediaElStream.getAudioTracks();
+        if (audioTracks && audioTracks.length) {
+          stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+        }
+      }
+    } catch {}
     let chunks = [];
-    let mime = 'video/webm;codecs=vp9';
-    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+    const mimeCandidates = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm'
+    ];
+    let mime = '';
+    for (const m of mimeCandidates) { if (MediaRecorder.isTypeSupported(m)) { mime = m; break; } }
+    const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 128_000 });
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     rec.onstop = () => {
       const blob = new Blob(chunks, { type: 'video/webm' });
@@ -683,56 +884,349 @@ export default function JPVideoSubApp() {
       setRecording(false);
     };
 
-    // Prepare draw
-    const padX = 16, padY = 16;
+    // Prepare draw with per-token highlight (scale to native resolution)
+    const wrapper = wrapperRef.current;
+    const displayW = Math.max(1, (wrapper?.clientWidth || width));
+    const scale = width / displayW; // scale UI px -> video native px
     const bgAlpha = opacity;
     const fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
+    const padX = Math.round(12 * scale), padY = Math.round(10 * scale);
+    const tokenGap = Math.round(4 * scale);
+    const lineGap = Math.round(6 * scale);
+    const cornerRadius = Math.round(10 * scale);
+
+    const POS_RGB = {
+      NOUN: '59,130,246', PROPN: '99,102,241', PRON: '14,165,233', PARTICLE: '16,185,129', VERB: '244,63,94', ADJ: '249,115,22', ADV: '245,158,11', EXPR: '139,92,246', NUM: '6,182,212', AUX: '236,72,153', COUNTER: '20,184,166', SYMBOL: '120,113,108', OTHER: '107,114,128'
+    };
+    function posBg(pos, active) {
+      const rgb = POS_RGB[(pos || 'OTHER').toUpperCase()] || POS_RGB.OTHER;
+      const a = active ? 1 : 0.4;
+      return `rgba(${rgb},${a})`;
+    }
+    function roundRect(context, x, y, w, h, r) {
+      const rr = Math.min(r, w / 2, h / 2);
+      context.beginPath();
+      context.moveTo(x + rr, y);
+      context.arcTo(x + w, y, x + w, y + h, rr);
+      context.arcTo(x + w, y + h, x, y + h, rr);
+      context.arcTo(x, y + h, x, y, rr);
+      context.arcTo(x, y, x + w, y, rr);
+      context.closePath();
+    }
+    function wrapWords(context, text, maxWidth) {
+      const s = String(text || '');
+      if (!s) return [];
+      const words = s.split(/\s+/).filter(Boolean);
+      const lines = [];
+      const pushChars = (str) => {
+        let cur = '';
+        for (const ch of Array.from(str)) {
+          const test = cur + ch;
+          if (context.measureText(test).width <= maxWidth || !cur) cur = test; else { lines.push(cur); cur = ch; }
+        }
+        if (cur) lines.push(cur);
+      };
+      if (words.length <= 1) { pushChars(s); return lines; }
+      let line = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const test = line + ' ' + words[i];
+        if (context.measureText(test).width <= maxWidth) line = test; else { lines.push(line); line = words[i]; }
+      }
+      if (context.measureText(line).width > maxWidth) { pushChars(line); } else { lines.push(line); }
+      return lines;
+    }
+    function getActiveTokenIndex(seg, rel, punctSkipLocal) {
+      const tokens = seg.tokens || [];
+      if (!tokens.length) return -1;
+      for (let i = 0; i < tokens.length; i++) {
+        const start = tokens[i].t ?? 0;
+        const end = (() => {
+          if (typeof tokens[i].end === 'number') return tokens[i].end;
+          if (typeof tokens[i].d === 'number') return start + tokens[i].d;
+          const nextT = tokens[i + 1]?.t; return typeof nextT === 'number' ? nextT : (seg.end - seg.start);
+        })();
+        if (rel >= start && rel < end) {
+          if (!isPunctToken(tokens[i])) return i;
+          if ((rel - start) >= punctSkipLocal) {
+            for (let j = i + 1; j < tokens.length; j++) if (!isPunctToken(tokens[j])) return j;
+          }
+          for (let j = i - 1; j >= 0; j--) if (!isPunctToken(tokens[j])) return j;
+          for (let j = i + 1; j < tokens.length; j++) if (!isPunctToken(tokens[j])) return j;
+          return i;
+        }
+      }
+      let bestIndex = -1; let bestDelta = Infinity;
+      for (let i = 0; i < tokens.length; i++) {
+        const delta = Math.abs(rel - (tokens[i].t ?? 0));
+        if (delta < bestDelta) { bestDelta = delta; bestIndex = i; }
+      }
+      if (bestIndex >= 0 && isPunctToken(tokens[bestIndex])) {
+        for (let j = bestIndex - 1; j >= 0; j--) if (!isPunctToken(tokens[j])) return j;
+        for (let j = bestIndex + 1; j < tokens.length; j++) if (!isPunctToken(tokens[j])) return j;
+      }
+      return bestIndex;
+    }
+
     function drawOverlayFrame(nowTime) {
-      ctx.clearRect(0,0,width,height);
-      ctx.drawImage(vid, 0, 0, width, height);
+      ctx.clearRect(0, 0, width, height);
+      if (hasVideo) {
+        ctx.drawImage(vid, 0, 0, width, height);
+      } else if (bgImageRef.current) {
+        const img = bgImageRef.current;
+        // cover
+        const imgW = img.naturalWidth || img.width;
+        const imgH = img.naturalHeight || img.height;
+        const scale = Math.max(width / imgW, height / imgH);
+        const dw = imgW * scale;
+        const dh = imgH * scale;
+        const dx = (width - dw) / 2;
+        const dy = (height - dh) / 2;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, dx, dy, dw, dh);
+      }
       const tNow = nowTime + highlightOffset;
       const segIdx = findSegmentAtTime(data.segments, tNow);
       const seg = segIdx >= 0 ? data.segments[segIdx] : null;
       if (!seg) return;
-      const boxH = subFontSize * 2 + padY * 2 + 8; // JP + VI
-      const boxY = height - boxH - 36 + subOffsetY;
-      ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
-      ctx.fillRect(8, boxY, width - 16, boxH);
+
+      // Layout area
       ctx.textBaseline = 'top';
-      ctx.fillStyle = '#e5e7eb';
-      ctx.font = `600 ${subFontSize}px ${fontFamily}`;
-      // JP line (A: ...)
-      const jpText = `A: ${seg.jp || ''}`;
-      ctx.fillText(jpText, padX, boxY + padY);
-      // VI line
-      ctx.fillStyle = 'rgba(228,228,231,0.95)';
-      ctx.font = `500 ${subFontSize}px ${fontFamily}`;
-      const viLines = splitViLines(seg.vi);
-      const viText = viLines.join(' ');
-      ctx.fillText(viText, padX, boxY + padY + subFontSize + 4);
+      const outerMargin = Math.round(8 * scale);
+      const panelW = width - outerMargin * 2; // total panel width inside outer margins
+      const innerW = panelW - outerMargin * 2; // preserve spacing similar to UI
+      const x0 = outerMargin; // panel left
+      const contentW = innerW - 2 * padX; // content area width inside panel
+      const centerX = x0 + padX + Math.round(contentW / 2);
+      const subFontSizeScaled = Math.max(8 * scale, subFontSize * scale);
+      const readingFontSizeScaled = Math.max(8 * scale, Math.round(subFontSizeScaled * 0.7));
+
+      // VI text: split sentences and wrap per line, center each line
+      const vi = String(seg.vi || '');
+      const viFontSizeScaled = Math.max(10 * scale, (subFontSize - 2) * scale);
+      ctx.font = `500 ${viFontSizeScaled}px ${fontFamily}`;
+      const sentences = vi.split(/(?<=\.)\s+/).map(s => s.trim()).filter(Boolean);
+      const toWrapped = (txt) => {
+        const words = txt.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let current = '';
+        for (const w of words) {
+          const test = current ? current + ' ' + w : w;
+          if (ctx.measureText(test).width <= contentW) current = test; else { if (current) lines.push(current); current = w; }
+        }
+        if (current) lines.push(current);
+        return lines.length ? lines : [''];
+      };
+      const viLines = sentences.length ? sentences.flatMap(toWrapped) : toWrapped(vi);
+      const viLineH = viFontSizeScaled + Math.round(2 * scale);
+      const viBlockH_all = viLines.length ? viLines.length * viLineH + Math.max(0, (viLines.length - 1) * Math.round(2 * scale)) : 0;
+
+      // Compute VOCAB line (top): disabled for export to avoid extra top lines
+      const showVocabTopLocal = false;
+      let vocabLines = [];
+      let vocabBlockH = 0;
+      if (showVocabTopLocal) {
+        const vocabList = extractVocabList(seg);
+        ctx.font = `700 ${Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9))}px ${fontFamily}`;
+        const items = vocabList.length ? vocabList : [];
+        // render as one item per line
+        vocabLines = items;
+        const vocabLineH = Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9)) + Math.round(2 * scale);
+        vocabBlockH = vocabLines.length ? (vocabLines.length * vocabLineH + Math.max(0, (vocabLines.length - 1) * Math.round(2 * scale))) : 0;
+      }
+
+      // Build JP/VI per-sentence layout (wrap JP tokens to multiple rows, keep font size)
+      const segTokens = seg.tokens || [];
+      // Active token index within segment for ring
+      const segOffset = segOffsets[segIdx] || 0;
+      const rel = (tNow + tokenLead + segOffset) - seg.start;
+      const activeIdx = getActiveTokenIndex(seg, rel, punctSkip);
+
+      // Precompute sentences
+      const sents = splitTokensBySentences(segTokens);
+      const viPartsAll = splitViLines(seg.vi);
+      const jpViLayouts = [];
+      const tokenPadXBase = Math.round(4 * scale);
+      const tokenPadYBase = Math.round(3 * scale);
+      const subFontPxBase = Math.max(8 * scale, subFontSizeScaled);
+      const readingFontPxBase = Math.max(8 * scale, readingFontSizeScaled);
+      const tokenGapBase = Math.max(1, Math.round(tokenGap));
+      for (let li = 0; li < sents.length; li++) {
+        const line = sents[li];
+        // Measure JP boxes at base size
+        ctx.font = `700 ${subFontPxBase}px ${fontFamily}`;
+        const boxesAll = [];
+        for (const [tk, gi] of line) {
+          const label = tk.surface || '';
+          const w = Math.ceil(ctx.measureText(label).width) + tokenPadXBase * 2;
+          const h = subFontPxBase + tokenPadYBase * 2;
+          boxesAll.push({ tk, gi, w, h });
+        }
+        const tagWBase = Math.ceil(ctx.measureText('A:').width) + Math.round(6 * scale);
+
+        // Wrap boxes across multiple rows to keep font size
+        const jpRows = [];
+        let idx = 0;
+        let firstRow = true;
+        while (idx < boxesAll.length) {
+          const row = [];
+          const anyReadingRow = { value: false };
+          const avail = firstRow ? (contentW - tagWBase) : contentW;
+          let used = 0; let count = 0;
+          while (idx < boxesAll.length) {
+            const b = boxesAll[idx];
+            const wPlus = (count === 0 ? b.w : (b.w + tokenGapBase));
+            if (count > 0 && used + wPlus > avail) break;
+            used += wPlus; row.push(b); count++;
+            if (showFurigana && b.tk.reading && !isPunctToken(b.tk)) anyReadingRow.value = true;
+            idx++;
+            // if single token doesn't fit even when first in row, force it
+            if (count === 1 && b.w > avail) { break; }
+          }
+          const tagWRow = firstRow ? tagWBase : 0;
+          const anyReadingBool = anyReadingRow.value;
+          const jpLineW = tagWRow + used;
+          const jpLineH = (anyReadingBool ? (readingFontPxBase + Math.round(2 * scale)) : 0) + (subFontPxBase + Math.round(2 * scale));
+          jpRows.push({ boxes: row, tagW: tagWRow, jpLineW, jpLineH, anyReading: anyReadingBool });
+          firstRow = false;
+        }
+
+        // VI for this sentence (wrap)
+        ctx.font = `500 ${viFontSizeScaled}px ${fontFamily}`;
+        const viRaw = String(viPartsAll[li] || '');
+        const viWrapped = (() => {
+          const words = viRaw.split(/\s+/).filter(Boolean);
+          const lines = [];
+          let current = '';
+          for (const w of words) {
+            const test = current ? current + ' ' + w : w;
+            if (ctx.measureText(test).width <= contentW) current = test; else { if (current) lines.push(current); current = w; }
+          }
+          if (current) lines.push(current);
+          return lines;
+        })();
+        const viLineH_local = viFontSizeScaled + Math.round(2 * scale);
+        const viBlockH_local = viWrapped.length ? (viWrapped.length * viLineH_local + Math.max(0, (viWrapped.length - 1) * Math.round(2 * scale))) : 0;
+        // total JP block height for this sentence (sum of row heights + small gaps between rows)
+        const rowGap = Math.round(2 * scale);
+        const jpBlockH_local = jpRows.reduce((s, r) => s + r.jpLineH, 0) + Math.max(0, (jpRows.length - 1) * rowGap);
+        jpViLayouts.push({ jpRows, jpBlockH: jpBlockH_local, rowGap, viWrapped, viLineH: viLineH_local, viBlockH: viBlockH_local, subFontPx: subFontPxBase, readingFontPx: readingFontPxBase, tokenGap: tokenGapBase });
+      }
+
+      const sentenceGap = Math.round(10 * scale);
+      const jpBlockH = jpViLayouts.reduce((s, it) => s + it.jpBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * sentenceGap);
+      const viBlockH = jpViLayouts.reduce((s, it) => s + it.viBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * Math.round(2 * scale));
+      const boxH = padY + vocabBlockH + (vocabBlockH ? Math.round(6 * scale) : 0) + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
+      const bottomMargin = Math.round(36 * scale);
+      const offsetY = Math.round(subOffsetY * scale);
+      // Keep subtitle panel strictly within frame
+      let boxY = subCentered ? (Math.round(height / 2 - boxH / 2 + offsetY)) : (height - boxH - bottomMargin + offsetY);
+      if (boxY < 0) boxY = 0; if (boxY + boxH > height) boxY = Math.max(0, height - boxH);
+
+      // Panel background
+      ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
+      roundRect(ctx, x0, boxY, innerW + outerMargin * 2, boxH, Math.max(8, Math.round(16 * scale)));
+      ctx.fill();
+
+      // Draw VOCAB top (disabled for export)
+      if (showVocabTopLocal && vocabLines.length) {
+        ctx.fillStyle = '#f4f4f5';
+        ctx.textAlign = 'center';
+        ctx.font = `700 ${Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9))}px ${fontFamily}`;
+        let vy = boxY + padY;
+        for (const l of vocabLines) { ctx.fillText(l, centerX, vy); vy += Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9)) + Math.round(2 * scale); }
+      }
+
+      // Draw sentences: JP tokens line (centered) then VI lines (centered)
+      let jy = boxY + padY + vocabBlockH + (vocabBlockH ? Math.round(6 * scale) : 0);
+      for (const layout of jpViLayouts) {
+        // Draw JP rows for this sentence
+        for (const row of layout.jpRows) {
+          let x = x0 + padX + Math.round((contentW - row.jpLineW) / 2);
+          ctx.textAlign = 'left';
+          ctx.font = `700 ${subFontPxBase}px ${fontFamily}`;
+          ctx.fillStyle = '#e5e7eb';
+          if (row.tagW) {
+            const tagY = jy + (row.anyReading ? (readingFontPxBase + Math.round(2 * scale)) : 0);
+            ctx.fillText('A:', x, tagY);
+            x += row.tagW;
+          }
+          for (const b of row.boxes) {
+            const isActive = highlightEnabled && b.gi === activeIdx && !isPunctToken(b.tk);
+            const bg = posBg(b.tk.pos, isActive);
+            if (row.anyReading && showFurigana && b.tk.reading && !isPunctToken(b.tk)) {
+              ctx.font = `500 ${readingFontPxBase}px ${fontFamily}`;
+              ctx.fillStyle = '#e4e4e7';
+              const rw = Math.ceil(ctx.measureText(b.tk.reading).width);
+              const rx = x + Math.round((b.w - rw) / 2);
+              ctx.fillText(b.tk.reading, rx, jy);
+            }
+            const baseY = jy + (row.anyReading ? (readingFontPxBase + Math.round(2 * scale)) : 0);
+            if (!isPunctToken(b.tk)) {
+              roundRect(ctx, x, baseY - Math.round(2 * scale), b.w, subFontPxBase + Math.round(6 * scale), Math.max(6, Math.round(8 * scale)));
+              ctx.fillStyle = bg; ctx.fill();
+              if (isActive) { ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(1, Math.round(2 * scale)); roundRect(ctx, x, baseY - Math.round(2 * scale), b.w, subFontPxBase + Math.round(6 * scale), Math.max(6, Math.round(8 * scale))); ctx.stroke(); }
+            }
+            ctx.font = `700 ${subFontPxBase}px ${fontFamily}`; ctx.fillStyle = '#ffffff';
+            ctx.fillText(b.tk.surface || '', x + Math.round(4 * scale), baseY);
+            x += b.w + tokenGapBase;
+          }
+          jy += row.jpLineH + layout.rowGap;
+        }
+        // VI lines for this sentence
+        ctx.textAlign = 'center'; ctx.font = `500 ${viFontSizeScaled}px ${fontFamily}`; ctx.fillStyle = 'rgba(228,228,231,0.95)';
+        for (const l of layout.viWrapped) { ctx.fillText(l, centerX, jy); jy += layout.viLineH; }
+        jy += sentenceGap;
+      }
+
+      // Optional: draw current time debug marker for multi-sentence verification
+      // ctx.fillStyle = '#0f0'; ctx.fillRect(4, 4, 2, 8);
     }
 
     // Playback and record
     setRecording(true);
     chunks = [];
     rec.start(500);
-    const useRVFC = typeof vid.requestVideoFrameCallback === 'function';
+    const useRVFC = hasVideo && typeof vid.requestVideoFrameCallback === 'function';
     let rafId = 0;
     function onFrame(_n, metadata) {
-      drawOverlayFrame((metadata && typeof metadata.mediaTime === 'number') ? metadata.mediaTime : vid.currentTime);
+      const useAudioClock = !!audioMainRef.current;
+      const time = useAudioClock
+        ? (audioMainRef.current.currentTime || 0)
+        : (hasVideo ? ((metadata && typeof metadata.mediaTime === 'number') ? metadata.mediaTime : vid.currentTime) : 0);
+      drawOverlayFrame(time);
       if (useRVFC) vid.requestVideoFrameCallback(onFrame); else rafId = requestAnimationFrame(() => onFrame());
     }
     if (useRVFC) vid.requestVideoFrameCallback(onFrame); else rafId = requestAnimationFrame(() => onFrame());
 
-    const onEnded = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      rec.stop();
-      vid.removeEventListener('ended', onEnded);
+    const onVideoEnded = () => {
+      if (!audioMainRef.current) {
+        if (rafId) cancelAnimationFrame(rafId);
+        try { rec.stop(); } catch {}
+      }
+      vid.removeEventListener('ended', onVideoEnded);
     };
-    vid.addEventListener('ended', onEnded);
-    // restart from start
-    try { vid.currentTime = 0; } catch {}
-    try { vid.play(); } catch {}
+    if (hasVideo) {
+      vid.addEventListener('ended', onVideoEnded);
+      try { vid.currentTime = 0; } catch {}
+      // If there is audio, drive by audio; otherwise let video play once
+      if (audioMainRef.current) {
+        const a = audioMainRef.current;
+        const stopWhenAudioEnds = () => { try { rec.stop(); } catch {}; setPlaying(false); };
+        a.addEventListener('ended', stopWhenAudioEnds, { once: true });
+        try { a.currentTime = 0; a.play(); } catch {}
+      } else {
+        try { vid.play(); } catch {}
+      }
+    } else if (audioMainRef.current) {
+      const a = audioMainRef.current;
+      const stopWhenAudioEnds = () => {
+        try { a.pause(); } catch {}
+        try { rec.stop(); } catch {}
+        setPlaying(false);
+      };
+      a.addEventListener('ended', stopWhenAudioEnds, { once: true });
+      try { a.currentTime = 0; a.play(); } catch {}
+    }
   }
 
   const Legend = () => (
@@ -763,6 +1257,27 @@ export default function JPVideoSubApp() {
             </label>
             <label className="btn-upload">
               <Upload className="icon-4" />
+              <span className="btn-label">Ảnh nền</span>
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                const f = e.target.files?.[0]; if (!f) return;
+                const url = URL.createObjectURL(f);
+                setImageURL(url);
+              }} />
+            </label>
+            <label className="btn-upload">
+              <Upload className="icon-4" />
+              <span className="btn-label">Audio</span>
+              <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => {
+                const f = e.target.files?.[0]; if (!f) return;
+                const url = URL.createObjectURL(f);
+                setAudioMainURL(url);
+              }} />
+            </label>
+            <button className="btn" onClick={() => setSttOpen(v => !v)}>
+              <span>Audio → SRT</span>
+            </button>
+            <label className="btn-upload">
+              <Upload className="icon-4" />
               <span className="btn-label">JSON</span>
               <input type="file" accept="application/json" style={{ display: 'none' }} onChange={onJsonFile} />
             </label>
@@ -771,14 +1286,149 @@ export default function JPVideoSubApp() {
               <span className="btn-label">SRT</span>
               <input type="file" accept=".srt,text/plain,application/x-subrip" style={{ display: 'none' }} onChange={onSrtFile} />
             </label>
+            <Link to="/image-video" style={{ textDecoration: 'none' }}>
+              <button className="btn">
+                <span>Tạo video AI từ ảnh</span>
+              </button>
+            </Link>
           </div>
         </div>
 
+        {sttOpen && (
+          <div className="segments-panel" style={{ marginTop: '0.75rem' }}>
+            <div className="segments-header">
+              <h2 className="app-title" style={{ fontSize: '1.125rem' }}>Tạo SRT từ Audio (Whisper)</h2>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">Chọn Audio</span>
+                <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => setSttAudioFile(e.target.files?.[0] || null)} />
+              </label>
+              <input placeholder="OpenAI API Key (bỏ trống để dùng server tự host)" value={sttApiKey} onChange={(e) => setSttApiKey(e.target.value)} style={{ flex: '1 1 240px', minWidth: 200, padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46' }} />
+              <input placeholder="API Base (ví dụ: https://api.openai.com hoặc http://localhost:3000)" value={sttApiBase} onChange={(e) => setSttApiBase(e.target.value)} style={{ flex: '1 1 260px', minWidth: 240, padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46' }} />
+              <select value={sttModel} onChange={(e) => setSttModel(e.target.value)} style={{ padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46' }}>
+                <option value="whisper-1">whisper-1</option>
+              </select>
+              <button className="btn" disabled={!sttAudioFile || sttLoading} onClick={async () => {
+                if (!sttAudioFile) return; setSttLoading(true); setSttError(''); setSttResult('');
+                try {
+                  const form = new FormData();
+                  form.append('file', sttAudioFile);
+                  form.append('model', sttModel);
+                  form.append('response_format', 'srt');
+                  const base = sttApiBase.replace(/\/$/, '');
+                  const res = await fetch(`${base}/v1/audio/transcriptions`, {
+                    method: 'POST',
+                    headers: sttApiKey ? { Authorization: `Bearer ${sttApiKey}` } : {},
+                    body: form,
+                  });
+                  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+                  const srtText = await res.text();
+                  setSttResult(srtText);
+                } catch (err) {
+                  setSttError(String(err?.message || err));
+                } finally {
+                  setSttLoading(false);
+                }
+              }}>{sttLoading ? 'Đang nhận dạng…' : 'Tạo SRT'}</button>
+              <button className="btn" disabled={!sttResult} onClick={() => {
+                try {
+                  const blob = new Blob([sttResult], { type: 'text/plain;charset=utf-8' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'transcript.srt';
+                  document.body.appendChild(a); a.click();
+                  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+                } catch {}
+              }}>Tải SRT</button>
+              <button className="btn" disabled={!sttResult} onClick={() => {
+                try {
+                  const obj = srtToSegments(sttResult);
+                  setData(normalizeData(obj)); setSimTime(0);
+                } catch (e) {
+                  alert('SRT không hợp lệ');
+                }
+              }}>Nạp vào app</button>
+              <button className="btn" disabled={!sttAudioFile || sttLoading} onClick={async () => {
+                if (!sttAudioFile) return; setSttLoading(true); setSttError(''); setSttResult('');
+                try {
+                  if (!localTranscribePipeline) {
+                    const { pipeline, env } = await import('@xenova/transformers');
+                    env.useBrowserCache = true;
+                    env.allowLocalModels = false;
+                    env.HF_ENDPOINT = 'https://huggingface.co';
+                    try { env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/'; } catch {}
+                    localTranscribePipeline = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', { quantized: true });
+                  }
+                  const arrayBuffer = await sttAudioFile.arrayBuffer();
+                  const AC = window.AudioContext || window.webkitAudioContext;
+                  const audioCtx = new AC();
+                  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+                  const out = await localTranscribePipeline(decoded, {
+                    chunk_length_s: 30,
+                    stride_length_s: 5,
+                    language: 'ja', // TODO: expose language select
+                    return_timestamps: true,
+                  });
+                  // Xây SRT từ out.chunks
+                  const toSrtTime = (s) => {
+                    const ms = Math.floor((s % 1) * 1000).toString().padStart(3, '0');
+                    const sec = Math.floor(s) % 60; const mm = Math.floor(s / 60) % 60; const hh = Math.floor(s / 3600);
+                    const p2 = (n) => n.toString().padStart(2, '0');
+                    return `${p2(hh)}:${p2(mm)}:${p2(sec)},${ms}`;
+                  };
+                  let idx = 1; const lines = [];
+                  const segments = out.segments || out.chunks || [];
+                  for (const c of segments) {
+                    const ts = c.timestamp || c.timestamps || c.time_offset || [c.start ?? 0, c.end ?? ((c.start ?? 0) + 1)];
+                    const start = Math.max(0, (Array.isArray(ts) ? ts[0] : c.start) || 0);
+                    const end = Math.max(start, (Array.isArray(ts) ? ts[1] : c.end) || (start + 1));
+                    const text = (c.text || c.chunk || '').trim();
+                    if (!text) continue;
+                    lines.push(String(idx++));
+                    lines.push(`${toSrtTime(start)} --> ${toSrtTime(end)}`);
+                    lines.push(text);
+                    lines.push('');
+                  }
+                  const srtText = lines.join('\n');
+                  setSttResult(srtText);
+                } catch (err) {
+                  const msg = String(err?.message || err);
+                  if (msg.includes('Unexpected token') && msg.includes('<')) {
+                    setSttError('Không tải được tệp mô hình (có thể mạng/HuggingFace bị chặn). Hãy kiểm tra kết nối hoặc thử lại sau.');
+                  } else {
+                    setSttError(msg);
+                  }
+                } finally {
+                  setSttLoading(false);
+                }
+              }}>Local (no API)</button>
+            </div>
+            {sttError && (<div style={{ color: '#fca5a5', marginTop: '0.5rem' }}>Lỗi: {sttError}</div>)}
+            {sttResult && (
+              <div style={{ marginTop: '0.5rem', maxHeight: '12rem', overflow: 'auto', background: 'rgba(39,39,42,0.4)', padding: '0.5rem', borderRadius: '0.5rem', whiteSpace: 'pre-wrap' }}>
+                {sttResult}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Player + Subtitle Panel */}
         <div className="layout">
-          <div className="video-wrapper tiktok">
+          <div className="video-wrapper tiktok" ref={wrapperRef}>
             {videoURL ? (
-              <video ref={videoRef} src={videoURL} controls playsInline onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} />
+              <video ref={videoRef} src={videoURL} controls playsInline loop={!!audioMainURL} muted={!!audioMainURL} onLoadedMetadata={() => { try { setMediaDuration(videoRef.current?.duration || 0); } catch {} }} onPlay={() => {
+                setPlaying(true);
+                const a = audioMainRef.current;
+                if (a) { try { a.play(); } catch {} }
+              }} onPause={() => {
+                setPlaying(false);
+                const a = audioMainRef.current;
+                if (a) { try { a.pause(); } catch {} }
+              }} />
+            ) : imageURL ? (
+              <img ref={bgImageRef} src={imageURL} alt="bg" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : (
               <div className="video-placeholder">
                 <div className="placeholder-text">
@@ -787,70 +1437,58 @@ export default function JPVideoSubApp() {
                 </div>
               </div>
             )}
+            {audioMainURL && (
+              <audio ref={audioMainRef} src={audioMainURL} preload="auto" onLoadedMetadata={() => { try { setMediaDuration(audioMainRef.current?.duration || 0); } catch {} }} style={{ display: 'none' }} />
+            )}
 
             {/* Sub overlay (mobile only) */}
             <div className={`subtitle-overlay ${subCentered ? 'center' : ''}`}>
               <div className="overlay-inner">
-                <div className="overlay-panel" style={{ backgroundColor: `rgba(0,0,0,${opacity})`, ['--sub-font-size']: `${subFontSize}px`, ['--sub-offset-y']: `${subOffsetY}px` }}>
-                  {currentSeg ? (
-                    <div className="subs-current">
-                      {/* Hiragana reading line */}
-                      {/* <div className="hira-line">
-                        {splitTokensBySentences(currentSeg.tokens).map((line, li) => (
-                          <span key={`h-${li}`} style={{ display: 'block' }}>
-                            {line.map(([tk]) => tk.reading || tk.surface).join('')}
-                          </span>
-                        ))}
-                      </div> */}
-                      {/* Kanji line with highlight */}
-                      {splitTokensBySentences(currentSeg.tokens).map((line, li) => (
-                        <div key={li} className="token-line">
-                          <span className="speaker-tag">A:</span>
-                          {line.map(([tk, i]) => {
-                            const isHighlightable = !isPunctToken(tk);
-                            const isActive = i === currentTokenIndex;
-                            const active = isActive && isHighlightable;
-                            return (
-                              <span
-                                key={i}
-                                className={`pos-token token-shell ${active ? 'token-active token-ring' : ''}`}
-                                data-pos={tk.pos}
-                                data-active={active ? 'true' : 'false'}
-                              >
-                                {showFurigana && !isPunctToken(tk) ? (
-                                  <ruby className="[ruby-position:over]">
-                                    <span className="token-inner">{tk.surface}</span>
-                                    <rt className="text-xs md:text-sm font-normal" style={{ color: '#e4e4e7' }}>{tk.reading}</rt>
-                                  </ruby>
-                                ) : (
-                                  <span className="token-inner">{tk.surface}</span>
-                                )}
-                                {showRomaji && (
-                                  <div className="token-romaji">{tk.romaji}</div>
-                                )}
-                                {active && showVietnamese && tk.vi && (
-                                  <div className="token-vi">
-                                    {tk.vi}
-                                  </div>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ))}
+                {currentSeg && (
+                  <div className="overlay-panel" style={{ backgroundColor: `rgba(0,0,0,${opacity})`, ['--sub-font-size']: `${subFontSize}px`, ['--sub-offset-y']: `${subOffsetY}px` }}>
+                    <div className="subs-current" data-hl={highlightEnabled ? 'on' : 'off'}>
+                      {(() => {
+                        const viLines = splitViLines(currentSeg?.vi);
+                        const sents = splitTokensBySentences(currentSeg.tokens);
+                        return sents.map((line, li) => (
+                          <div key={li} style={{ marginBottom: '6px' }}>
+                            <div className="token-line">
+                              <span className="speaker-tag">A:</span>
+                              {line.map(([tk, i]) => {
+                                const isHighlightable = !isPunctToken(tk);
+                                const isActive = i === currentTokenIndex;
+                                const active = highlightEnabled && isActive && isHighlightable;
+                                return (
+                                  <span
+                                    key={i}
+                                    className={`pos-token token-shell ${active ? 'token-active' : ''}`}
+                                    data-pos={tk.pos}
+                                    data-active={active ? 'true' : 'false'}
+                                  >
+                                    {showFurigana && !isPunctToken(tk) ? (
+                                      <ruby className="[ruby-position:over]">
+                                        <span className={`token-inner ${active ? 'token-ring' : ''}`}>{tk.surface}</span>
+                                        <rt className="text-xs md:text-sm font-normal" style={{ color: '#e4e4e7' }}>{tk.reading}</rt>
+                                      </ruby>
+                                    ) : (
+                                      <span className={`token-inner ${active ? 'token-ring' : ''}`}>{tk.surface}</span>
+                                    )}
+                                    {showRomaji && (
+                                      <div className="token-romaji">{tk.romaji}</div>
+                                    )}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            {showVietnamese && viLines[li] && (
+                              <div className="overlay-vi">{viLines[li]}</div>
+                            )}
+                          </div>
+                        ));
+                      })()}
                     </div>
-                  ) : (
-                    <div className="empty">(Không có câu trong thời điểm này)</div>
-                  )}
-
-                  {showVietnamese && (
-                    <div className="overlay-vi">
-                      {splitViLines(currentSeg?.vi).map((ln, idx) => (
-                        <div key={idx}>{ln}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -904,7 +1542,19 @@ export default function JPVideoSubApp() {
               {playing ? <Pause className="icon-4" /> : <Play className="icon-4" />}
               <span>{playing ? 'Pause' : 'Play'}</span>
             </button>
-            <button onClick={() => { if (demo) setSimTime(0); else if (videoRef.current) videoRef.current.currentTime = 0; }} className="btn">
+            <button onClick={() => {
+              if (demo) { setSimTime(0); setPlaying(false); return; }
+              if (videoRef.current && videoURL) {
+                try { videoRef.current.pause(); videoRef.current.currentTime = 0; } catch {}
+                setPlaying(false); setSimTime(0);
+                return;
+              }
+              if (audioMainRef.current && !videoURL) {
+                try { audioMainRef.current.pause(); audioMainRef.current.currentTime = 0; } catch {}
+                setPlaying(false); setSimTime(0);
+                return;
+              }
+            }} className="btn">
               <RefreshCw className="icon-4" />
               <span>Reset</span>
             </button>
@@ -912,7 +1562,7 @@ export default function JPVideoSubApp() {
               <DownloadIcon className="icon-4" />
               <span>Tải SRT</span>
             </button>
-            <button onClick={recordVideoWithSub} className="btn" disabled={recording}>
+            <button onClick={recordVideoWithSub} className="btn" disabled={recording || (!videoURL && !imageURL)}>
               <DownloadIcon className="icon-4" />
               <span>{recording ? 'Đang ghi...' : 'Tải video + sub'}</span>
             </button>
@@ -932,7 +1582,7 @@ export default function JPVideoSubApp() {
             </div>
             <div className="control-group">
               <span className="btn-label">Cỡ chữ</span>
-              <input type="range" min={10} max={24} step={1} value={subFontSize} onChange={(e) => setSubFontSize(parseInt(e.target.value))} className="slider" />
+              <input type="range" min={12} max={36} step={1} value={subFontSize} onChange={(e) => setSubFontSize(parseInt(e.target.value))} className="slider" />
               <span className="rate-value">{subFontSize}px</span>
             </div>
             <div className="control-group">
@@ -956,6 +1606,14 @@ export default function JPVideoSubApp() {
               <span className="rate-value">{punctSkip.toFixed(3)}s</span>
             </div>
             <label className="check-label">
+              <input type="checkbox" checked={highlightEnabled} onChange={(e) => setHighlightEnabled(e.target.checked)} />
+              <span className="btn-label">Bật highlight</span>
+            </label>
+            <label className="check-label">
+              <input type="checkbox" checked={showVocabTop} onChange={(e) => setShowVocabTop(e.target.checked)} />
+              <span className="btn-label">Hiện từ vựng phía trên</span>
+            </label>
+            <label className="check-label">
               <input type="checkbox" checked={showFurigana} onChange={(e) => setShowFurigana(e.target.checked)} />
               <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Type className="icon-4" /> Furigana</span>
             </label>
@@ -978,7 +1636,7 @@ export default function JPVideoSubApp() {
         <div className="segments-panel">
           <div className="segments-header">
             <h2 className="app-title" style={{ fontSize: '1.125rem' }}>Danh sách câu</h2>
-            <span className="now-badge">Now: {secondsToTimestamp(now)}</span>
+            <span className="now-badge">Now: {secondsToTimestamp(Math.max(0, simTime))}{mediaDuration ? ` / ${secondsToTimestamp(mediaDuration)}` : ''}</span>
           </div>
           <div className="segment-list">
             {data.segments.map((s, si) => (
@@ -1029,6 +1687,38 @@ export default function JPVideoSubApp() {
             ))}
           </div>
           <p className="legend-note">Bạn có thể mở rộng map màu trong mã (DEFAULT_POS_COLORS) để thêm loại từ khác (ví dụ: INTERJ, CONJ, DET…).</p>
+        </div>
+
+        {/* Vocab JP–VI for current segment */}
+        <div className="legend-panel" style={{ marginTop: '0.75rem' }}>
+          <div className="legend-header" style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Highlighter className="icon-5" />
+              <h3 className="app-title" style={{ fontSize: '1rem' }}>Từ vựng JP–VI (câu hiện tại)</h3>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button className="btn" onClick={copyVocabCsv} disabled={!vocabEntries.length}>Copy CSV</button>
+              <button className="btn" onClick={downloadVocabCsv} disabled={!vocabEntries.length}>Tải CSV</button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '0.5rem' }}>
+            <div className="legend-item" style={{ fontWeight: 700 }}>
+              <span>JP</span>
+            </div>
+            <div className="legend-item" style={{ fontWeight: 700 }}>
+              <span>Reading</span>
+            </div>
+            <div className="legend-item" style={{ fontWeight: 700 }}>
+              <span>VI</span>
+            </div>
+            {vocabEntries.map((it, idx) => (
+              <React.Fragment key={idx}>
+                <div className="legend-item"><span>{it.surface}</span></div>
+                <div className="legend-item"><span>{it.reading}</span></div>
+                <div className="legend-item"><span>{it.vi}</span></div>
+              </React.Fragment>
+            ))}
+          </div>
         </div>
 
         {/* Hướng dẫn nhanh */}

@@ -42,53 +42,54 @@
 }
 
 /* POS token highlight (robust, not dependent on dynamic Tailwind classes) */
-.pos-token[data-pos="NOUN"] { background-color: rgb(59 130 246 / 0.40); }
-.pos-token[data-pos="NOUN"][data-active="true"] { background-color: rgb(59 130 246); }
+.pos-token[data-pos="NOUN"] .token-inner { background-color: rgb(59 130 246 / 0.40); }
+.pos-token[data-pos="NOUN"][data-active="true"] .token-inner { background-color: rgb(59 130 246); }
 
-.pos-token[data-pos="PROPN"] { background-color: rgb(99 102 241 / 0.40); }
-.pos-token[data-pos="PROPN"][data-active="true"] { background-color: rgb(99 102 241); }
+.pos-token[data-pos="PROPN"] .token-inner { background-color: rgb(99 102 241 / 0.40); }
+.pos-token[data-pos="PROPN"][data-active="true"] .token-inner { background-color: rgb(99 102 241); }
 
-.pos-token[data-pos="PRON"] { background-color: rgb(14 165 233 / 0.40); }
-.pos-token[data-pos="PRON"][data-active="true"] { background-color: rgb(14 165 233); }
+.pos-token[data-pos="PRON"] .token-inner { background-color: rgb(14 165 233 / 0.40); }
+.pos-token[data-pos="PRON"][data-active="true"] .token-inner { background-color: rgb(14 165 233); }
 
-.pos-token[data-pos="PARTICLE"] { background-color: rgb(16 185 129 / 0.40); }
-.pos-token[data-pos="PARTICLE"][data-active="true"] { background-color: rgb(16 185 129); }
+.pos-token[data-pos="PARTICLE"] .token-inner { background-color: rgb(16 185 129 / 0.40); }
+.pos-token[data-pos="PARTICLE"][data-active="true"] .token-inner { background-color: rgb(16 185 129); }
 
-.pos-token[data-pos="VERB"] { background-color: rgb(244 63 94 / 0.40); }
-.pos-token[data-pos="VERB"][data-active="true"] { background-color: rgb(244 63 94); }
+.pos-token[data-pos="VERB"] .token-inner { background-color: rgb(244 63 94 / 0.40); }
+.pos-token[data-pos="VERB"][data-active="true"] .token-inner { background-color: rgb(244 63 94); }
 
-.pos-token[data-pos="ADJ"] { background-color: rgb(249 115 22 / 0.40); }
-.pos-token[data-pos="ADJ"][data-active="true"] { background-color: rgb(249 115 22); }
+.pos-token[data-pos="ADJ"] .token-inner { background-color: rgb(249 115 22 / 0.40); }
+.pos-token[data-pos="ADJ"][data-active="true"] .token-inner { background-color: rgb(249 115 22); }
 
-.pos-token[data-pos="ADV"] { background-color: rgb(245 158 11 / 0.40); }
-.pos-token[data-pos="ADV"][data-active="true"] { background-color: rgb(245 158 11); }
+.pos-token[data-pos="ADV"] .token-inner { background-color: rgb(245 158 11 / 0.40); }
+.pos-token[data-pos="ADV"][data-active="true"] .token-inner { background-color: rgb(245 158 11); }
 
-.pos-token[data-pos="EXPR"] { background-color: rgb(139 92 246 / 0.40); }
-.pos-token[data-pos="EXPR"][data-active="true"] { background-color: rgb(139 92 246); }
+.pos-token[data-pos="EXPR"] .token-inner { background-color: rgb(139 92 246 / 0.40); }
+.pos-token[data-pos="EXPR"][data-active="true"] .token-inner { background-color: rgb(139 92 246); }
 
-.pos-token[data-pos="NUM"] { background-color: rgb(6 182 212 / 0.40); }
-.pos-token[data-pos="NUM"][data-active="true"] { background-color: rgb(6 182 212); }
+.pos-token[data-pos="NUM"] .token-inner { background-color: rgb(6 182 212 / 0.40); }
+.pos-token[data-pos="NUM"][data-active="true"] .token-inner { background-color: rgb(6 182 212); }
 
-.pos-token[data-pos="AUX"] { background-color: rgb(236 72 153 / 0.40); }
-.pos-token[data-pos="AUX"][data-active="true"] { background-color: rgb(236 72 153); }
+.pos-token[data-pos="AUX"] .token-inner { background-color: rgb(236 72 153 / 0.40); }
+.pos-token[data-pos="AUX"][data-active="true"] .token-inner { background-color: rgb(236 72 153); }
 
-.pos-token[data-pos="COUNTER"] { background-color: rgb(20 184 166 / 0.40); }
-.pos-token[data-pos="COUNTER"][data-active="true"] { background-color: rgb(20 184 166); }
+.pos-token[data-pos="COUNTER"] .token-inner { background-color: rgb(20 184 166 / 0.40); }
+.pos-token[data-pos="COUNTER"][data-active="true"] .token-inner { background-color: rgb(20 184 166); }
 
-.pos-token[data-pos="PUNCT"] { background-color: transparent; }
-.pos-token[data-pos="PUNCT"][data-active="true"] { background-color: transparent; }
+.pos-token[data-pos="PUNCT"] .token-inner { background-color: transparent; }
+.pos-token[data-pos="PUNCT"][data-active="true"] .token-inner { background-color: transparent; }
 
-.pos-token[data-pos="SYMBOL"] { background-color: rgb(120 113 108 / 0.40); }
-.pos-token[data-pos="SYMBOL"][data-active="true"] { background-color: rgb(120 113 108); }
+.pos-token[data-pos="SYMBOL"] .token-inner { background-color: rgb(120 113 108 / 0.40); }
+.pos-token[data-pos="SYMBOL"][data-active="true"] .token-inner { background-color: rgb(120 113 108); }
 
-.pos-token[data-pos="OTHER"] { background-color: rgb(107 114 128 / 0.40); }
-.pos-token[data-pos="OTHER"][data-active="true"] { background-color: rgb(107 114 128); }
+.pos-token[data-pos="OTHER"] .token-inner { background-color: rgb(107 114 128 / 0.40); }
+.pos-token[data-pos="OTHER"][data-active="true"] .token-inner { background-color: rgb(107 114 128); }
 
 /* Token presentation without Tailwind utilities */
 .token-shell {
-  display: inline-block;
-  padding-left: 2px;
-  padding-right: 2px;
+  display: inline-flex;
+  align-items: flex-end;
+  padding-left: 0px;
+  padding-right: 0px;
   border-radius: 0.75rem; /* rounded-xl */
   transition-property: none;
   transition-duration: 0s;
@@ -101,16 +102,15 @@
 
 .token-inner {
   display: inline-block;
-  padding-left: 0px;
-  padding-right: 0px;
-  border-radius: 0.375rem; /* rounded-md */
+  padding: 0 2px; /* provide interior padding so bg doesn't touch glyphs */
+  border-radius: 0.5rem;
   transition: none;
   background-color: transparent;
 }
 
 .token-ring {
-  outline: 2px solid rgba(255, 255, 255, 0.8);
-  outline-offset: 2px; /* render ring outside, not over text */
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
 }
 
 .token-romaji {
@@ -205,7 +205,7 @@
 }
 
 .video-placeholder {
-  aspect-ratio: 16 / 9; width: 100%; display: flex; align-items: center; justify-content: center; background: #18181b;
+  aspect-ratio: 9 / 16; width: 100%; display: flex; align-items: center; justify-content: center; background: #18181b;
 }
 .placeholder-text { text-align: center; opacity: 0.9; }
 .placeholder-title { font-size: 1.125rem; font-weight: 500; }
@@ -217,7 +217,11 @@
 .overlay-panel { backdrop-filter: blur(4px); border-radius: 1rem; padding: 0.5rem 0.75rem; }
 @media (min-width: 768px) { .overlay-panel { padding: 0.75rem 1rem; } }
 .subs-current { line-height: 1.5; font-weight: 600; font-size: var(--sub-font-size, 12px); }
+.subs-current[data-hl="off"] .token-inner { background-color: transparent !important; }
+.subs-current[data-hl="off"] .token-ring { outline: none !important; }
 .token-line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 3px; justify-content: center; }
+.token-line ruby { display: inline-flex; flex-direction: column; align-items: center; }
+.token-line rt { line-height: 1; margin-bottom: 2px; }
 .subs-current .token-line + .token-line { margin-top: 6px; }
 .empty { text-align: center; color: #d4d4d8; }
 .overlay-vi { text-align: center; margin-top: 0.5rem; font-size: var(--sub-font-size, 12px); color: rgba(228,228,231,0.95); font-weight: 500; }
