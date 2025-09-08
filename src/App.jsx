@@ -3,8 +3,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 let localTranscribePipeline = null;
 import { Link } from 'react-router-dom';
 import * as wanakana from 'wanakana';
-import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon } from "lucide-react";
+import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, FileText } from "lucide-react";
 import "./App.css";
+import TTSPanel from './components/TTSPanel';
+import AudioFilesList from './components/AudioFilesList';
+import YouTubeDownloader from './components/YouTubeDownloader';
+import STTConverter from './components/STTConverter';
+import YouTubeTester from './components/YouTubeTester';
 
 // =============================================================
 // JP–VI Video Sub App (React) – Furigana + POS Highlight
@@ -254,9 +259,13 @@ export default function JPVideoSubApp() {
   const [punctSkip, setPunctSkip] = useState(0.06); // seconds to skip into next token when inside punctuation
   const [highlightEnabled, setHighlightEnabled] = useState(true);
   const [showVocabTop, setShowVocabTop] = useState(false);
+  const [ttsOpen, setTtsOpen] = useState(false);
+  const [audioFilesOpen, setAudioFilesOpen] = useState(false);
+  const [youtubeOpen, setYoutubeOpen] = useState(false);
+  const [sttOpen, setSttOpen] = useState(false);
+  const [youtubeTestOpen, setYoutubeTestOpen] = useState(false);
 
   // STT (Audio -> SRT)
-  const [sttOpen, setSttOpen] = useState(false);
   const [sttApiKey, setSttApiKey] = useState('');
   const [sttModel, setSttModel] = useState('whisper-1');
   const [sttApiBase, setSttApiBase] = useState('https://api.openai.com');
@@ -1276,6 +1285,26 @@ export default function JPVideoSubApp() {
             <button className="btn" onClick={() => setSttOpen(v => !v)}>
               <span>Audio → SRT</span>
             </button>
+            <button className="btn" onClick={() => setTtsOpen(true)}>
+              <Volume2 className="icon-4" />
+              <span>Text → Audio</span>
+            </button>
+            <button className="btn" onClick={() => setAudioFilesOpen(true)}>
+              <DownloadIcon className="icon-4" />
+              <span>File Audio</span>
+            </button>
+            <button className="btn" onClick={() => setYoutubeOpen(true)}>
+              <DownloadIcon className="icon-4" />
+              <span>YouTube</span>
+            </button>
+            <button className="btn" onClick={() => setSttOpen(true)}>
+              <FileText className="icon-4" />
+              <span>Audio → SRT</span>
+            </button>
+            <button className="btn" onClick={() => setYoutubeTestOpen(true)}>
+              <Play className="icon-4" />
+              <span>Test YouTube</span>
+            </button>
             <label className="btn-upload">
               <Upload className="icon-4" />
               <span className="btn-label">JSON</span>
@@ -1734,6 +1763,21 @@ export default function JPVideoSubApp() {
           <p style={{ marginTop: '0.5rem' }}>Gợi ý pipeline tạo JSON: tách câu từ SRT/ASS → chạy phân tách hình thái (MeCab/Sudachi/KUROMOJI) → ghép reading (kana) + romaji → gán POS + thời điểm <i>t</i> trong câu (từ mô hình align hoặc heuristic chia đều).</p>
         </div>
       </div>
+
+      {/* TTS Panel */}
+      <TTSPanel isOpen={ttsOpen} onClose={() => setTtsOpen(false)} />
+      
+      {/* Audio Files List */}
+      <AudioFilesList isOpen={audioFilesOpen} onClose={() => setAudioFilesOpen(false)} />
+      
+      {/* YouTube Downloader */}
+      <YouTubeDownloader isOpen={youtubeOpen} onClose={() => setYoutubeOpen(false)} />
+      
+      {/* STT Converter */}
+      <STTConverter isOpen={sttOpen} onClose={() => setSttOpen(false)} />
+      
+      {/* YouTube Tester */}
+      <YouTubeTester isOpen={youtubeTestOpen} onClose={() => setYoutubeTestOpen(false)} />
     </div>
   );
 }
