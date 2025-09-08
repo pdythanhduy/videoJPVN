@@ -3,13 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 let localTranscribePipeline = null;
 import { Link } from 'react-router-dom';
 import * as wanakana from 'wanakana';
-import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, FileText } from "lucide-react";
+import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, FileText, TrendingUp, Video } from "lucide-react";
 import "./App.css";
 import TTSPanel from './components/TTSPanel';
 import AudioFilesList from './components/AudioFilesList';
 import YouTubeDownloader from './components/YouTubeDownloader';
 import STTConverter from './components/STTConverter';
 import YouTubeTester from './components/YouTubeTester';
+import TrendsToolSimple from './components/TrendsToolSimple';
+import AIVideoTool from './components/AIVideoTool';
 
 // =============================================================
 // JP–VI Video Sub App (React) – Furigana + POS Highlight
@@ -258,12 +260,13 @@ export default function JPVideoSubApp() {
   const [subCentered, setSubCentered] = useState(true);
   const [punctSkip, setPunctSkip] = useState(0.06); // seconds to skip into next token when inside punctuation
   const [highlightEnabled, setHighlightEnabled] = useState(true);
-  const [showVocabTop, setShowVocabTop] = useState(false);
   const [ttsOpen, setTtsOpen] = useState(false);
   const [audioFilesOpen, setAudioFilesOpen] = useState(false);
   const [youtubeOpen, setYoutubeOpen] = useState(false);
   const [sttOpen, setSttOpen] = useState(false);
   const [youtubeTestOpen, setYoutubeTestOpen] = useState(false);
+  const [trendsOpen, setTrendsOpen] = useState(false);
+  const [aiVideoOpen, setAiVideoOpen] = useState(false);
 
   // STT (Audio -> SRT)
   const [sttApiKey, setSttApiKey] = useState('');
@@ -1029,19 +1032,6 @@ export default function JPVideoSubApp() {
       const viLineH = viFontSizeScaled + Math.round(2 * scale);
       const viBlockH_all = viLines.length ? viLines.length * viLineH + Math.max(0, (viLines.length - 1) * Math.round(2 * scale)) : 0;
 
-      // Compute VOCAB line (top): disabled for export to avoid extra top lines
-      const showVocabTopLocal = false;
-      let vocabLines = [];
-      let vocabBlockH = 0;
-      if (showVocabTopLocal) {
-        const vocabList = extractVocabList(seg);
-        ctx.font = `700 ${Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9))}px ${fontFamily}`;
-        const items = vocabList.length ? vocabList : [];
-        // render as one item per line
-        vocabLines = items;
-        const vocabLineH = Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9)) + Math.round(2 * scale);
-        vocabBlockH = vocabLines.length ? (vocabLines.length * vocabLineH + Math.max(0, (vocabLines.length - 1) * Math.round(2 * scale))) : 0;
-      }
 
       // Build JP/VI per-sentence layout (wrap JP tokens to multiple rows, keep font size)
       const segTokens = seg.tokens || [];
@@ -1124,7 +1114,7 @@ export default function JPVideoSubApp() {
       const sentenceGap = Math.round(10 * scale);
       const jpBlockH = jpViLayouts.reduce((s, it) => s + it.jpBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * sentenceGap);
       const viBlockH = jpViLayouts.reduce((s, it) => s + it.viBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * Math.round(2 * scale));
-      const boxH = padY + vocabBlockH + (vocabBlockH ? Math.round(6 * scale) : 0) + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
+      const boxH = padY + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
       const bottomMargin = Math.round(36 * scale);
       const offsetY = Math.round(subOffsetY * scale);
       // Keep subtitle panel strictly within frame
@@ -1136,17 +1126,9 @@ export default function JPVideoSubApp() {
       roundRect(ctx, x0, boxY, innerW + outerMargin * 2, boxH, Math.max(8, Math.round(16 * scale)));
       ctx.fill();
 
-      // Draw VOCAB top (disabled for export)
-      if (showVocabTopLocal && vocabLines.length) {
-        ctx.fillStyle = '#f4f4f5';
-        ctx.textAlign = 'center';
-        ctx.font = `700 ${Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9))}px ${fontFamily}`;
-        let vy = boxY + padY;
-        for (const l of vocabLines) { ctx.fillText(l, centerX, vy); vy += Math.max(10 * scale, Math.round(subFontSizeScaled * 0.9)) + Math.round(2 * scale); }
-      }
 
       // Draw sentences: JP tokens line (centered) then VI lines (centered)
-      let jy = boxY + padY + vocabBlockH + (vocabBlockH ? Math.round(6 * scale) : 0);
+      let jy = boxY + padY;
       for (const layout of jpViLayouts) {
         // Draw JP rows for this sentence
         for (const row of layout.jpRows) {
@@ -1259,67 +1241,79 @@ export default function JPVideoSubApp() {
             <h1 className="app-title">JP–VI Video Sub • Furigana + POS Highlight</h1>
           </div>
           <div className="header-actions">
-            <label className="btn-upload">
-              <Upload className="icon-4" />
-              <span className="btn-label">Video</span>
-              <input type="file" accept="video/mp4,video/webm" style={{ display: 'none' }} onChange={onVideoFile} />
-            </label>
-            <label className="btn-upload">
-              <Upload className="icon-4" />
-              <span className="btn-label">Ảnh nền</span>
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
-                const f = e.target.files?.[0]; if (!f) return;
-                const url = URL.createObjectURL(f);
-                setImageURL(url);
-              }} />
-            </label>
-            <label className="btn-upload">
-              <Upload className="icon-4" />
-              <span className="btn-label">Audio</span>
-              <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => {
-                const f = e.target.files?.[0]; if (!f) return;
-                const url = URL.createObjectURL(f);
-                setAudioMainURL(url);
-              }} />
-            </label>
-            <button className="btn" onClick={() => setSttOpen(v => !v)}>
-              <span>Audio → SRT</span>
-            </button>
-            <button className="btn" onClick={() => setTtsOpen(true)}>
-              <Volume2 className="icon-4" />
-              <span>Text → Audio</span>
-            </button>
-            <button className="btn" onClick={() => setAudioFilesOpen(true)}>
-              <DownloadIcon className="icon-4" />
-              <span>File Audio</span>
-            </button>
-            <button className="btn" onClick={() => setYoutubeOpen(true)}>
-              <DownloadIcon className="icon-4" />
-              <span>YouTube</span>
-            </button>
-            <button className="btn" onClick={() => setSttOpen(true)}>
-              <FileText className="icon-4" />
-              <span>Audio → SRT</span>
-            </button>
-            <button className="btn" onClick={() => setYoutubeTestOpen(true)}>
-              <Play className="icon-4" />
-              <span>Test YouTube</span>
-            </button>
-            <label className="btn-upload">
-              <Upload className="icon-4" />
-              <span className="btn-label">JSON</span>
-              <input type="file" accept="application/json" style={{ display: 'none' }} onChange={onJsonFile} />
-            </label>
-            <label className="btn-upload">
-              <Upload className="icon-4" />
-              <span className="btn-label">SRT</span>
-              <input type="file" accept=".srt,text/plain,application/x-subrip" style={{ display: 'none' }} onChange={onSrtFile} />
-            </label>
-            <Link to="/image-video" style={{ textDecoration: 'none' }}>
-              <button className="btn">
-                <span>Tạo video AI từ ảnh</span>
+            {/* Upload Files */}
+            <div className="upload-group">
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">Video</span>
+                <input type="file" accept="video/mp4,video/webm" style={{ display: 'none' }} onChange={onVideoFile} />
+              </label>
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">Audio</span>
+                <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={(e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  const url = URL.createObjectURL(f);
+                  setAudioMainURL(url);
+                }} />
+              </label>
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">JSON</span>
+                <input type="file" accept="application/json" style={{ display: 'none' }} onChange={onJsonFile} />
+              </label>
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">SRT</span>
+                <input type="file" accept=".srt,text/plain,application/x-subrip" style={{ display: 'none' }} onChange={onSrtFile} />
+              </label>
+            </div>
+            
+            {/* Tools */}
+            <div className="tools-group">
+              <button className="btn" onClick={() => setTtsOpen(true)}>
+                <Volume2 className="icon-4" />
+                <span>TTS</span>
               </button>
-            </Link>
+              <button className="btn" onClick={() => setSttOpen(true)}>
+                <FileText className="icon-4" />
+                <span>STT</span>
+              </button>
+              <button className="btn" onClick={() => setYoutubeOpen(true)}>
+                <DownloadIcon className="icon-4" />
+                <span>YouTube</span>
+              </button>
+              <button className="btn" onClick={() => setAudioFilesOpen(true)}>
+                <DownloadIcon className="icon-4" />
+                <span>Files</span>
+              </button>
+              <button className="btn" onClick={() => setTrendsOpen(true)}>
+                <TrendingUp className="icon-4" />
+                <span>Trends</span>
+              </button>
+              <button className="btn" onClick={() => setAiVideoOpen(true)}>
+                <Video className="icon-4" />
+                <span>AI Video</span>
+              </button>
+            </div>
+            
+            {/* Other */}
+            <div className="other-group">
+              <label className="btn-upload">
+                <Upload className="icon-4" />
+                <span className="btn-label">Ảnh</span>
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  const url = URL.createObjectURL(f);
+                  setImageURL(url);
+                }} />
+              </label>
+              <Link to="/image-video" style={{ textDecoration: 'none' }}>
+                <button className="btn">
+                  <span>AI Video</span>
+                </button>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -1639,10 +1633,6 @@ export default function JPVideoSubApp() {
               <span className="btn-label">Bật highlight</span>
             </label>
             <label className="check-label">
-              <input type="checkbox" checked={showVocabTop} onChange={(e) => setShowVocabTop(e.target.checked)} />
-              <span className="btn-label">Hiện từ vựng phía trên</span>
-            </label>
-            <label className="check-label">
               <input type="checkbox" checked={showFurigana} onChange={(e) => setShowFurigana(e.target.checked)} />
               <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Type className="icon-4" /> Furigana</span>
             </label>
@@ -1778,6 +1768,12 @@ export default function JPVideoSubApp() {
       
       {/* YouTube Tester */}
       <YouTubeTester isOpen={youtubeTestOpen} onClose={() => setYoutubeTestOpen(false)} />
+      
+      {/* Trends Tool */}
+      <TrendsToolSimple isOpen={trendsOpen} onClose={() => setTrendsOpen(false)} />
+      
+      {/* AI Video Tool */}
+      <AIVideoTool isOpen={aiVideoOpen} onClose={() => setAiVideoOpen(false)} />
     </div>
   );
 }

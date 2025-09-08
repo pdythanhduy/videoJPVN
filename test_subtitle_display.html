@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Display Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            background: #1a1a1a;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .subtitle-box {
+            background: rgba(0,0,0,0.75);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .subtitle-line {
+            padding: 8px 0;
+            text-align: center;
+            border-radius: 4px;
+            margin: 2px 0;
+        }
+        .subtitle-line.highlight {
+            background: rgba(59, 130, 246, 0.2);
+            color: #ffffff;
+        }
+        .subtitle-line.active {
+            color: #f4f4f5;
+        }
+        .subtitle-line.inactive {
+            color: #a1a1aa;
+        }
+        .jp-text {
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .vi-text {
+            font-size: 10px;
+            font-weight: 500;
+            color: #e5e7eb;
+        }
+        .vi-text.inactive {
+            color: #71717a;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Subtitle Display Test - 5 Lines with Highlight</h1>
+        
+        <div class="controls">
+            <button onclick="prevSubtitle()">← Previous</button>
+            <button onclick="nextSubtitle()">Next →</button>
+            <button onclick="toggleHighlight()">Toggle Highlight</button>
+        </div>
+
+        <div class="subtitle-box" id="subtitleBox">
+            <!-- Subtitle lines will be generated here -->
+        </div>
+
+        <div class="info">
+            <h3>Features:</h3>
+            <ul>
+                <li>✅ 5 subtitle lines displayed</li>
+                <li>✅ Highlight in center (line 3)</li>
+                <li>✅ Blue background for current subtitle</li>
+                <li>✅ Different colors for active/inactive</li>
+                <li>✅ Japanese (JP) and Vietnamese (VI) text</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Sample subtitle data
+        const subtitles = [
+            { jp: "こんにちは", vi: "Xin chào" },
+            { jp: "元気ですか", vi: "Bạn có khỏe không?" },
+            { jp: "今日は天気がいいですね", vi: "Hôm nay thời tiết đẹp nhỉ" },
+            { jp: "ありがとうございました", vi: "Cảm ơn bạn" },
+            { jp: "また明日", vi: "Hẹn gặp lại ngày mai" },
+            { jp: "お疲れ様でした", vi: "Bạn đã làm việc vất vả" },
+            { jp: "おやすみなさい", vi: "Chúc ngủ ngon" },
+            { jp: "いってらっしゃい", vi: "Đi cẩn thận nhé" },
+            { jp: "ただいま", vi: "Tôi về rồi" },
+            { jp: "おかえりなさい", vi: "Chào mừng về nhà" }
+        ];
+
+        let currentIndex = 2; // Start with line 3 highlighted
+        const totalLines = 5;
+        const highlightIndex = 2; // Center line
+
+        function renderSubtitles() {
+            const container = document.getElementById('subtitleBox');
+            container.innerHTML = '';
+
+            // Calculate which subtitles to show
+            const startIndex = Math.max(0, currentIndex - highlightIndex);
+            const endIndex = Math.min(subtitles.length - 1, startIndex + totalLines - 1);
+
+            for (let i = startIndex; i <= endIndex; i++) {
+                const subtitle = subtitles[i];
+                const isHighlight = i === currentIndex;
+                const isActive = i === currentIndex;
+
+                const lineDiv = document.createElement('div');
+                lineDiv.className = `subtitle-line ${isHighlight ? 'highlight' : (isActive ? 'active' : 'inactive')}`;
+
+                const jpDiv = document.createElement('div');
+                jpDiv.className = 'jp-text';
+                jpDiv.textContent = subtitle.jp;
+
+                const viDiv = document.createElement('div');
+                viDiv.className = `vi-text ${isHighlight ? '' : 'inactive'}`;
+                viDiv.textContent = subtitle.vi;
+
+                lineDiv.appendChild(jpDiv);
+                lineDiv.appendChild(viDiv);
+                container.appendChild(lineDiv);
+            }
+        }
+
+        function prevSubtitle() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderSubtitles();
+            }
+        }
+
+        function nextSubtitle() {
+            if (currentIndex < subtitles.length - 1) {
+                currentIndex++;
+                renderSubtitles();
+            }
+        }
+
+        function toggleHighlight() {
+            // This would toggle highlight in real app
+            console.log('Toggle highlight - current index:', currentIndex);
+        }
+
+        // Auto-advance for demo
+        setInterval(() => {
+            if (currentIndex < subtitles.length - 1) {
+                currentIndex++;
+                renderSubtitles();
+            } else {
+                currentIndex = 0;
+                renderSubtitles();
+            }
+        }, 3000);
+
+        // Initial render
+        renderSubtitles();
+    </script>
+</body>
+</html>

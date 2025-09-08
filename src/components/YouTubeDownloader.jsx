@@ -11,6 +11,8 @@ const YouTubeDownloader = ({ isOpen, onClose }) => {
   const [downloadProgress, setDownloadProgress] = useState('');
   const [downloadedFiles, setDownloadedFiles] = useState([]);
   const [downloadType, setDownloadType] = useState('video'); // 'video' or 'audio'
+  const [previewFile, setPreviewFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
 
   // Load downloaded files
   useEffect(() => {
@@ -166,6 +168,32 @@ const YouTubeDownloader = ({ isOpen, onClose }) => {
       console.error('Lỗi download file:', error);
       alert(`Lỗi download file: ${error.message}`);
     }
+  };
+
+  const handlePreviewFile = async (filename) => {
+    try {
+      const previewUrl = `http://localhost:8000/api/youtube/files/${filename}`;
+      
+      // Kiểm tra xem file có phải video không
+      const isVideo = filename.toLowerCase().match(/\.(mp4|avi|mov|mkv|webm)$/);
+      
+      if (isVideo) {
+        setPreviewFile(filename);
+        setPreviewUrl(previewUrl);
+      } else {
+        // Nếu là audio, mở trong tab mới
+        window.open(previewUrl, '_blank');
+      }
+      
+    } catch (error) {
+      console.error('Lỗi preview file:', error);
+      alert('Lỗi preview file: ' + error.message);
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewFile(null);
+    setPreviewUrl('');
   };
 
   const deleteFile = async (filename) => {
@@ -429,6 +457,13 @@ const YouTubeDownloader = ({ isOpen, onClose }) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <button
+                        onClick={() => handlePreviewFile(file.filename)}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Play className="icon-4" />
+                        Xem
+                      </button>
+                      <button
                         onClick={() => downloadFile(file.filename)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
                       >
@@ -466,6 +501,52 @@ const YouTubeDownloader = ({ isOpen, onClose }) => {
           </div>
         </div>
       </div>
+
+      {/* Video Preview Modal */}
+      {previewFile && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-zinc-800 rounded-xl p-6 max-w-4xl w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Xem trước: {previewFile}</h3>
+              <button
+                onClick={closePreview}
+                className="text-zinc-400 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="relative">
+              <video
+                src={previewUrl}
+                controls
+                className="w-full h-auto max-h-96 bg-black rounded-lg"
+                preload="metadata"
+              >
+                Trình duyệt không hỗ trợ video.
+              </video>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => downloadFile(previewFile)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Download className="icon-4" />
+                Tải về
+              </button>
+              <button
+                onClick={closePreview}
+                className="bg-zinc-600 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

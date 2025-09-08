@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test AI Video Demo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn-success {
+            background: #10b981;
+        }
+        .btn-success:hover {
+            background: #059669;
+        }
+        .result {
+            background: #1f2937;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+        .success {
+            background: #14532d;
+            color: #86efac;
+        }
+        .demo-box {
+            background: #1e40af;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .prompt-examples {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .prompt-example {
+            background: #374151;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .prompt-example:hover {
+            background: #4b5563;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Test AI Video Demo</h1>
+        
+        <div class="demo-box">
+            <h2>🆓 100% FREE - No API Key Required!</h2>
+            <p>AI Video Tool hoạt động ngay lập tức với Demo Mode. Không cần đăng ký, không cần API key!</p>
+        </div>
+
+        <div class="test-section">
+            <h2>1. Test Backend Connection</h2>
+            <button class="btn" onclick="testBackend()">Test Backend</button>
+            <div id="backend-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Test AI Video Platforms</h2>
+            <button class="btn" onclick="testPlatforms()">Get Available Platforms</button>
+            <div id="platforms-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test AI Video Generation (Demo Mode)</h2>
+            <div class="prompt-examples">
+                <div class="prompt-example" onclick="setPrompt('A cat playing with a ball of yarn')">
+                    🐱 A cat playing with a ball of yarn
+                </div>
+                <div class="prompt-example" onclick="setPrompt('A dog running in a sunny park')">
+                    🐕 A dog running in a sunny park
+                </div>
+                <div class="prompt-example" onclick="setPrompt('A sunset over mountains')">
+                    🌅 A sunset over mountains
+                </div>
+                <div class="prompt-example" onclick="setPrompt('A person walking on a beach')">
+                    🏖️ A person walking on a beach
+                </div>
+            </div>
+            
+            <div style="margin: 15px 0;">
+                <label style="display: block; margin-bottom: 5px;">Custom Prompt:</label>
+                <input type="text" id="custom-prompt" placeholder="Enter your video prompt..." 
+                       style="width: 100%; padding: 8px; background: #374151; border: 1px solid #4b5563; border-radius: 4px; color: white;">
+            </div>
+            
+            <button class="btn btn-success" onclick="testVideoGeneration()">🎬 Generate Demo Video</button>
+            <div id="video-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Test Video Files</h2>
+            <button class="btn" onclick="testVideoFiles()">Get Generated Videos</button>
+            <div id="files-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Test Styles & Aspect Ratios</h2>
+            <button class="btn" onclick="testStyles()">Get Available Styles</button>
+            <button class="btn" onclick="testAspectRatios()">Get Aspect Ratios</button>
+            <div id="styles-result" class="result" style="display: none;"></div>
+            <div id="aspect-ratios-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="demo-box">
+            <h2>🎯 How to Use in App</h2>
+            <ol>
+                <li>Click <strong>"AI Video"</strong> button in the header</li>
+                <li>Enter your prompt in the text area</li>
+                <li>Choose settings (duration, style, aspect ratio)</li>
+                <li>Click <strong>"Generate from Text"</strong></li>
+                <li>Wait for the demo video to be created</li>
+                <li>Download and enjoy!</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.textContent = content;
+        }
+
+        function setPrompt(prompt) {
+            document.getElementById('custom-prompt').value = prompt;
+        }
+
+        async function testBackend() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('backend-result', `✅ Backend is running!\n\nResponse: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult('backend-result', `❌ Backend connection failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testPlatforms() {
+            try {
+                const response = await fetch(`${API_BASE}/api/ai-video/platforms`);
+                const data = await response.json();
+                showResult('platforms-result', `✅ Available platforms: ${data.platforms.join(', ')}\n\nNote: "demo" platform works without API keys!`);
+            } catch (error) {
+                showResult('platforms-result', `❌ Failed to get platforms!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testVideoGeneration() {
+            const prompt = document.getElementById('custom-prompt').value;
+            if (!prompt.trim()) {
+                showResult('video-result', '❌ Please enter a prompt first!', true);
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('duration', '5');
+                formData.append('platform', 'demo');
+                formData.append('style', 'realistic');
+                formData.append('aspect_ratio', '16:9');
+
+                const response = await fetch(`${API_BASE}/api/ai-video/generate`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult('video-result', `✅ Demo video generated successfully!\n\nResponse: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult('video-result', `❌ Video generation failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testVideoFiles() {
+            try {
+                const response = await fetch(`${API_BASE}/api/ai-video/files`);
+                const data = await response.json();
+                if (data.files.length === 0) {
+                    showResult('files-result', '📁 No video files found yet. Generate some videos first!');
+                } else {
+                    showResult('files-result', `✅ Found ${data.files.length} video files:\n\n${data.files.map(f => `- ${f.filename} (${(f.size/1024).toFixed(1)}KB)`).join('\n')}`);
+                }
+            } catch (error) {
+                showResult('files-result', `❌ Failed to get video files!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testStyles() {
+            try {
+                const response = await fetch(`${API_BASE}/api/ai-video/styles`);
+                const data = await response.json();
+                showResult('styles-result', `✅ Available styles: ${data.styles.join(', ')}`);
+            } catch (error) {
+                showResult('styles-result', `❌ Failed to get styles!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testAspectRatios() {
+            try {
+                const response = await fetch(`${API_BASE}/api/ai-video/aspect-ratios`);
+                const data = await response.json();
+                showResult('aspect-ratios-result', `✅ Available aspect ratios: ${data.aspect_ratios.join(', ')}`);
+            } catch (error) {
+                showResult('aspect-ratios-result', `❌ Failed to get aspect ratios!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        // Auto-test backend on load
+        window.addEventListener('load', () => {
+            setTimeout(testBackend, 1000);
+        });
+    </script>
+</body>
+</html>

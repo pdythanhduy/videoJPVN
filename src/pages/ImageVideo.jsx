@@ -198,22 +198,21 @@ export default function ImageVideo() {
       ctx.drawImage(image, dx, dy, drawW, drawH)
     }
 
-    // Subtitle box and current cue (JP + VI stacked, with wrapping)
+    // Subtitle display with smooth scrolling animation and more lines
     const cueTime = t + srtOffset
-    const cue = cues.find(c => cueTime >= c.start && cueTime <= c.end)
-    if (cue) {
-      const padX = 14, padY = 6
-      const innerGap = 4
-      const lineGap = 2
+    const currentCueIndex = cues.findIndex(c => cueTime >= c.start && cueTime <= c.end)
+    
+    if (currentCueIndex >= 0) {
+      const padX = 14, padY = 8
+      const lineGap = 4
       const boxW = W - 24
       const x = 12
       const bottomMargin = 28
+      // Show all content - no line limit
+      const totalLines = Math.min(cues.length, 20) // Show up to 20 lines or all available
+      const highlightIndex = Math.floor(totalLines / 2) // Center line
 
-      // Prepare fonts and wrap separately
-      const jpText = String(cue.jp || cue.text || '')
-      const viText = String(cue.vi || '')
-
-      const jpFontSize = 10
+      const jpFontSize = 11
       const viFontSize = 10
       const fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial'
 
@@ -221,38 +220,263 @@ export default function ImageVideo() {
       ctx.textAlign = 'center'
       const centerX = x + boxW / 2
 
-      ctx.font = `700 ${jpFontSize}px ${fontFamily}`
-      const jpLines = wrapSmart(ctx, jpText, boxW - 2 * padX)
-      const jpBlockH = jpLines.length > 0 ? (jpLines.length * jpFontSize + (jpLines.length - 1) * lineGap) : 0
-
-      ctx.font = `500 ${viFontSize}px ${fontFamily}`
-      const viLines = wrapSmart(ctx, viText, boxW - 2 * padX)
-      const viBlockH = viLines.length > 0 ? (viLines.length * viFontSize + (viLines.length - 1) * lineGap) : 0
-
-      const boxH = padY + jpBlockH + (jpBlockH && viBlockH ? innerGap : 0) + viBlockH + padY
-      const y = H - boxH - bottomMargin
-
-      // Background
-      ctx.fillStyle = 'rgba(0,0,0,0.65)'
-      ctx.fillRect(x, y, boxW, boxH)
-
-      // JP lines
-      ctx.fillStyle = '#f4f4f5'
-      ctx.font = `700 ${jpFontSize}px ${fontFamily}`
-      let cursorY = y + padY
-      for (let i = 0; i < jpLines.length; i++) {
-        ctx.fillText(jpLines[i], centerX, cursorY)
-        cursorY += jpFontSize + lineGap
+      // Show all cues with current one highlighted
+      const displayCues = []
+      
+      for (let i = 0; i < cues.length; i++) {
+        const cue = cues[i]
+        const isCurrent = i === currentCueIndex
+        const isPast = i < currentCueIndex
+        const isFuture = i > currentCueIndex
+        
+        // Calculate fade effect for past cues
+        let fadeAlpha = 1
+        if (isPast) {
+          const distance = currentCueIndex - i
+          fadeAlpha = Math.max(0.3, 1 - (distance * 0.1)) // Gentler fade
+        }
+        
+        displayCues.push({
+          ...cue,
+          isActive: isCurrent,
+          isHighlight: isCurrent,
+          isPast: isPast,
+          isFuture: isFuture,
+          fadeAlpha: fadeAlpha,
+          lineIndex: i
+        })
       }
 
-      // VI lines
-      if (viLines.length) {
-        if (jpLines.length) cursorY += innerGap - lineGap
-        ctx.fillStyle = '#e4e4e7'
-        ctx.font = `500 ${viFontSize}px ${fontFamily}`
-        for (let i = 0; i < viLines.length; i++) {
-          ctx.fillText(viLines[i], centerX, cursorY)
-          cursorY += viFontSize + lineGap
+      // Helper function to wrap text with better handling for Japanese and Vietnamese
+      const wrapText = (text, maxWidth, fontSize) => {
+        if (!text || text.trim() === '') return []
+        
+        ctx.font = `${fontSize}px ${fontFamily}`
+        
+        // For Japanese text, split by characters instead of words
+        const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text)
+        
+        if (isJapanese) {
+          // Japanese text wrapping by characters
+          const chars = text.split('')
+          const lines = []
+          let currentLine = ''
+          
+          for (const char of chars) {
+            const testLine = currentLine + char
+            const metrics = ctx.measureText(testLine)
+            
+            if (metrics.width > maxWidth && currentLine) {
+              lines.push(currentLine)
+              currentLine = char
+            } else {
+              currentLine = testLine
+            }
+          }
+          
+          if (currentLine) {
+            lines.push(currentLine)
+          }
+          
+          return lines
+        } else {
+          // Vietnamese/English text wrapping by words with better handling
+          const words = text.split(' ')
+          const lines = []
+          let currentLine = ''
+          
+          for (let i = 0; i < words.length; i++) {
+            const word = words[i]
+            const testLine = currentLine + (currentLine ? ' ' : '') + word
+            const metrics = ctx.measureText(testLine)
+            
+            if (metrics.width > maxWidth && currentLine) {
+              lines.push(currentLine)
+              currentLine = word
+            } else {
+              currentLine = testLine
+            }
+          }
+          
+          if (currentLine) {
+            lines.push(currentLine)
+          }
+          
+          // Debug logging for Vietnamese text
+          if (text.includes('yabai') || text.includes('tùy ngữ cảnh')) {
+            console.log('VI Text Wrapping Debug:')
+            console.log('Original text:', text)
+            console.log('Words:', words)
+            console.log('Lines:', lines)
+            console.log('Max width:', maxWidth)
+            console.log('Reconstructed:', lines.join(' '))
+            console.log('Match:', lines.join(' ') === text)
+          }
+          
+          return lines
+        }
+      }
+
+      // Calculate total height with text wrapping
+      let totalHeight = padY * 2
+      for (const cue of displayCues) {
+        const jpText = String(cue.jp || cue.text || '')
+        const viText = String(cue.vi || '')
+        
+        if (jpText) {
+          const jpLines = wrapText(jpText, boxW - 16, jpFontSize)
+          totalHeight += jpLines.length * (jpFontSize + 2)
+        }
+        
+        if (viText) {
+          const viLines = wrapText(viText, boxW - 16, viFontSize)
+          totalHeight += viLines.length * (viFontSize + lineGap)
+        } else {
+          totalHeight += lineGap
+        }
+      }
+      
+      // Ensure minimum height and add extra padding for safety
+      const minHeight = 300 // Increased minimum height
+      totalHeight = Math.max(totalHeight, minHeight)
+      totalHeight += 50 // More extra padding to prevent cutoff
+      
+      // Limit height to screen size
+      const maxHeight = H * 0.8 // Max 80% of screen height
+      totalHeight = Math.min(totalHeight, maxHeight)
+      
+      // Calculate position with scroll offset
+      const scrollOffset = 0 // Can be adjusted for scrolling
+      const y = H - totalHeight - bottomMargin - scrollOffset
+
+      // Background
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'
+      ctx.fillRect(x, y, boxW, totalHeight)
+      
+      // Add scroll indicator if content is too long
+      if (totalHeight >= maxHeight) {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)'
+        ctx.fillRect(x + boxW - 4, y, 2, totalHeight)
+      }
+
+      // Draw each subtitle line with text wrapping and fade effects
+      let cursorY = y + padY
+      
+      for (let i = 0; i < displayCues.length; i++) {
+        const cue = displayCues[i]
+        const isHighlight = cue.isHighlight
+        const isActive = cue.isActive
+        const isPast = cue.isPast
+        const isFuture = cue.isFuture
+        const fadeAlpha = cue.fadeAlpha || 1
+        
+        // Prepare text
+        const jpText = String(cue.jp || cue.text || '')
+        const viText = String(cue.vi || '')
+        
+        // Debug logging for current cue
+        if (isHighlight) {
+          const jpLines = wrapText(jpText, boxW - 16, jpFontSize)
+          const viLines = wrapText(viText, boxW - 16, viFontSize)
+          
+          console.log('=== CURRENT CUE DEBUG ===')
+          console.log('JP Text Length:', jpText.length)
+          console.log('VI Text Length:', viText.length)
+          console.log('JP Text:', jpText)
+          console.log('VI Text:', viText)
+          console.log('JP Lines:', jpLines)
+          console.log('VI Lines:', viLines)
+          console.log('JP Line Count:', jpLines.length)
+          console.log('VI Line Count:', viLines.length)
+          console.log('Box Width:', boxW - 16)
+          console.log('JP Font Size:', jpFontSize)
+          console.log('VI Font Size:', viFontSize)
+          console.log('========================')
+        }
+        
+        // Calculate height for this cue
+        let cueHeight = 0
+        if (jpText) {
+          const jpLines = wrapText(jpText, boxW - 16, jpFontSize)
+          cueHeight += jpLines.length * (jpFontSize + 2)
+        }
+        if (viText) {
+          const viLines = wrapText(viText, boxW - 16, viFontSize)
+          cueHeight += viLines.length * (viFontSize + lineGap)
+        } else {
+          cueHeight += lineGap
+        }
+        
+        // Skip rendering if too faded (past cues)
+        if (fadeAlpha < 0.1) {
+          cursorY += cueHeight
+          continue
+        }
+        
+        // Highlight background for current cue
+        if (isHighlight) {
+          ctx.fillStyle = `rgba(59, 130, 246, ${0.2 * fadeAlpha})` // Blue highlight with fade
+          ctx.fillRect(x + 4, cursorY - 2, boxW - 8, cueHeight + 4)
+        }
+        
+        // JP text with wrapping and fade effect
+        if (jpText) {
+          const jpLines = wrapText(jpText, boxW - 16, jpFontSize)
+          ctx.font = `700 ${jpFontSize}px ${fontFamily}`
+          
+          // Color with fade effect
+          let baseColor = '#ffffff'
+          if (isPast) {
+            baseColor = `rgba(160, 160, 170, ${fadeAlpha})` // Gray with fade
+          } else if (isFuture) {
+            baseColor = `rgba(160, 160, 170, ${fadeAlpha})` // Gray with fade
+          } else {
+            baseColor = `rgba(255, 255, 255, ${fadeAlpha})` // White with fade
+          }
+          
+          ctx.fillStyle = baseColor
+          
+          for (const line of jpLines) {
+            ctx.fillText(line, centerX, cursorY)
+            cursorY += jpFontSize + 2
+          }
+        }
+        
+        // VI text with wrapping and fade effect
+        if (viText) {
+          const viLines = wrapText(viText, boxW - 16, viFontSize)
+          ctx.font = `500 ${viFontSize}px ${fontFamily}`
+          
+          // Color with fade effect
+          let baseColor = '#e5e7eb'
+          if (isPast) {
+            baseColor = `rgba(113, 113, 122, ${fadeAlpha})` // Dark gray with fade
+          } else if (isFuture) {
+            baseColor = `rgba(113, 113, 122, ${fadeAlpha})` // Dark gray with fade
+          } else {
+            baseColor = `rgba(229, 231, 235, ${fadeAlpha})` // Light gray with fade
+          }
+          
+          ctx.fillStyle = baseColor
+          
+          for (const line of viLines) {
+            ctx.fillText(line, centerX, cursorY)
+            cursorY += viFontSize + lineGap
+          }
+        } else {
+          cursorY += lineGap
+        }
+        
+        // Debug logging for current cue to check text display
+        if (isHighlight) {
+          console.log('=== TEXT DISPLAY DEBUG ===')
+          console.log('JP Text:', jpText)
+          console.log('VI Text:', viText)
+          console.log('JP Lines:', jpLines)
+          console.log('VI Lines:', viLines)
+          console.log('JP Displayed:', jpLines.join(''))
+          console.log('VI Displayed:', viLines.join(' '))
+          console.log('========================')
         }
       }
     }

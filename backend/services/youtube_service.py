@@ -506,6 +506,10 @@ class YouTubeService:
                 "error": str(e)
             }
     
+    def get_file_path(self, filename: str) -> Path:
+        """Lấy đường dẫn file"""
+        return self.download_dir / filename
+    
     async def delete_file(self, filename: str) -> Dict[str, Any]:
         """Xóa file đã download"""
         try:

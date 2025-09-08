@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Text Display</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-box {
+            background: rgba(0,0,0,0.75);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        .jp-text {
+            font-size: 11px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .vi-text {
+            font-size: 10px;
+            font-weight: 500;
+            color: #e5e7eb;
+            line-height: 1.4;
+        }
+        .highlight {
+            background: rgba(59, 130, 246, 0.2);
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .debug {
+            background: #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .line-count {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        .error {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+        .success {
+            color: #51cf66;
+            font-weight: bold;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .current {
+            border: 2px solid #ff6b6b;
+        }
+        .expected {
+            border: 2px solid #51cf66;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Test Text Display</h1>
+        
+        <div class="comparison">
+            <div class="test-box highlight current">
+                <h3>Current Display (Wrong)</h3>
+                <div class="jp-text">
+                    昨日のライブ、やばかった！」と言えば「すごく楽しかった」という意味になります。<br>
+                    Hoặc nói Buổi live hôm qua yabakatta!<br><br>
+                    このように「やばい」は、状況によって良い意味にも悪い意味にもなる、とても便利で感情的な言葉です。<br>
+                    , thì có nghĩa là rất vui, cực hay
+                </div>
+            </div>
+            
+            <div class="test-box highlight expected">
+                <h3>Expected Display (Correct)</h3>
+                <div class="jp-text">
+                    昨日のライブ、やばかった！」と言えば「すごく楽しかった」という意味になります。<br>
+                    Hoặc nói Buổi live hôm qua yabakatta!, thì có nghĩa là rất vui, cực hay<br><br>
+                    このように「やばい」は、状況によって良い意味にも悪い意味にもなる、とても便利で感情的な言葉です。<br>
+                    Như vậy, yabai tùy ngữ cảnh có thể mang nghĩa xấu hoặc tốt, là một từ rất tiện dụng và giàu sắc thái cảm xúc
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-box highlight">
+            <h3>Test Case: Real Subtitle Data</h3>
+            <div class="jp-text" id="jp-display"></div>
+            <div class="vi-text" id="vi-display"></div>
+        </div>
+        
+        <div class="debug">
+            <h3>Debug Info:</h3>
+            <p>JP Text Length: <span id="jp-length"></span></p>
+            <p>VI Text Length: <span id="vi-length"></span></p>
+            <p>JP Line Count: <span id="jp-lines" class="line-count"></span></p>
+            <p>VI Line Count: <span id="vi-lines" class="line-count"></span></p>
+            <p>Total Lines: <span id="total-lines" class="line-count"></span></p>
+            <p>Box Width: <span id="box-width"></span></p>
+            <p>JP Font Size: <span id="jp-font-size"></span></p>
+            <p>VI Font Size: <span id="vi-font-size"></span></p>
+        </div>
+        
+        <div class="debug">
+            <h3>JP Lines:</h3>
+            <div id="jp-lines-debug"></div>
+        </div>
+        
+        <div class="debug">
+            <h3>VI Lines:</h3>
+            <div id="vi-lines-debug"></div>
+        </div>
+        
+        <div class="debug">
+            <h3>Text Analysis:</h3>
+            <div id="text-analysis"></div>
+        </div>
+    </div>
+
+    <script>
+        // Real test data
+        const testData = {
+            start: 58.66,
+            end: 73.04,
+            jp: "「昨日のライブ、やばかった！」と言えば「すごく楽しかった」という意味になります。このように「やばい」は、状況によって良い意味にも悪い意味にもなる、とても便利で感情的な言葉です。",
+            vi: "Hoặc nói Buổi live hôm qua yabakatta!, thì có nghĩa là rất vui, cực hay. Như vậy, yabai tùy ngữ cảnh có thể mang nghĩa xấu hoặc tốt, là một từ rất tiện dụng và giàu sắc thái cảm xúc."
+        };
+        
+        // Text wrapping function (same as in the app)
+        function wrapText(text, maxWidth, fontSize) {
+            if (!text || text.trim() === '') return [];
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            ctx.font = `${fontSize}px ${fontFamily}`;
+            
+            // For Japanese text, split by characters instead of words
+            const isJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+            
+            if (isJapanese) {
+                // Japanese text wrapping by characters
+                const chars = text.split('');
+                const lines = [];
+                let currentLine = '';
+                
+                for (const char of chars) {
+                    const testLine = currentLine + char;
+                    const metrics = ctx.measureText(testLine);
+                    
+                    if (metrics.width > maxWidth && currentLine) {
+                        lines.push(currentLine);
+                        currentLine = char;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                
+                return lines;
+            } else {
+                // Vietnamese/English text wrapping by words with better handling
+                const words = text.split(' ');
+                const lines = [];
+                let currentLine = '';
+                
+                for (let i = 0; i < words.length; i++) {
+                    const word = words[i];
+                    const testLine = currentLine + (currentLine ? ' ' : '') + word;
+                    const metrics = ctx.measureText(testLine);
+                    
+                    if (metrics.width > maxWidth && currentLine) {
+                        lines.push(currentLine);
+                        currentLine = word;
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                
+                if (currentLine) {
+                    lines.push(currentLine);
+                }
+                
+                return lines;
+            }
+        }
+        
+        // Test wrapping with different widths
+        const maxWidth = 400; // Simulate subtitle box width
+        const jpFontSize = 11;
+        const viFontSize = 10;
+        
+        const jpLines = wrapText(testData.jp, maxWidth, jpFontSize);
+        const viLines = wrapText(testData.vi, maxWidth, viFontSize);
+        
+        // Update display
+        document.getElementById('jp-length').textContent = testData.jp.length;
+        document.getElementById('vi-length').textContent = testData.vi.length;
+        document.getElementById('jp-lines').textContent = jpLines.length;
+        document.getElementById('vi-lines').textContent = viLines.length;
+        document.getElementById('total-lines').textContent = jpLines.length + viLines.length;
+        document.getElementById('box-width').textContent = maxWidth;
+        document.getElementById('jp-font-size').textContent = jpFontSize;
+        document.getElementById('vi-font-size').textContent = viFontSize;
+        
+        // Display wrapped text
+        document.getElementById('jp-display').innerHTML = jpLines.join('<br>');
+        document.getElementById('vi-display').innerHTML = viLines.join('<br>');
+        
+        // Debug lines
+        document.getElementById('jp-lines-debug').innerHTML = jpLines.map((line, i) => 
+            `<div>Line ${i + 1}: "${line}"</div>`
+        ).join('');
+        
+        document.getElementById('vi-lines-debug').innerHTML = viLines.map((line, i) => 
+            `<div>Line ${i + 1}: "${line}"</div>`
+        ).join('');
+        
+        // Text analysis
+        const analysis = [];
+        
+        // Check if all text is preserved
+        const jpReconstructed = jpLines.join('');
+        const viReconstructed = viLines.join(' ');
+        
+        if (jpReconstructed === testData.jp) {
+            analysis.push('<div class="success">✓ JP Text: All content preserved</div>');
+        } else {
+            analysis.push('<div class="error">✗ JP Text: Content lost or modified</div>');
+            analysis.push(`<div>Original: ${testData.jp}</div>`);
+            analysis.push(`<div>Reconstructed: ${jpReconstructed}</div>`);
+        }
+        
+        if (viReconstructed === testData.vi) {
+            analysis.push('<div class="success">✓ VI Text: All content preserved</div>');
+        } else {
+            analysis.push('<div class="error">✗ VI Text: Content lost or modified</div>');
+            analysis.push(`<div>Original: ${testData.vi}</div>`);
+            analysis.push(`<div>Reconstructed: ${viReconstructed}</div>`);
+        }
+        
+        // Check for specific text
+        if (testData.vi.includes('yabai tùy ngữ cảnh có thể mang nghĩa xấu hoặc tốt, là một từ rất tiện dụng và giàu sắc thái cảm xúc')) {
+            analysis.push('<div class="success">✓ VI Text: Contains full sentence</div>');
+        } else {
+            analysis.push('<div class="error">✗ VI Text: Missing full sentence</div>');
+        }
+        
+        document.getElementById('text-analysis').innerHTML = analysis.join('');
+        
+        console.log('JP Lines:', jpLines);
+        console.log('VI Lines:', viLines);
+        console.log('Total lines:', jpLines.length + viLines.length);
+        console.log('JP Reconstructed:', jpReconstructed);
+        console.log('VI Reconstructed:', viReconstructed);
+    </script>
+</body>
+</html>

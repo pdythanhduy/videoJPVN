@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Current Date</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .date-box {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .date-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #1f2937;
+            border-radius: 6px;
+        }
+        .label {
+            font-weight: bold;
+            color: #60a5fa;
+        }
+        .value {
+            color: #fbbf24;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📅 Test Current Date</h1>
+        
+        <div class="date-box">
+            <h2>JavaScript Date Formats</h2>
+            <div class="date-item">
+                <div class="label">new Date():</div>
+                <div class="value" id="js-date"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">toISOString():</div>
+                <div class="value" id="iso-date"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">toLocaleDateString('vi-VN'):</div>
+                <div class="value" id="vi-date"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">YYYY-MM-DD format:</div>
+                <div class="value" id="ymd-date"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">YYYYMMDD_HHMMSS format:</div>
+                <div class="value" id="timestamp-date"></div>
+            </div>
+        </div>
+
+        <div class="date-box">
+            <h2>Timezone Info</h2>
+            <div class="date-item">
+                <div class="label">Timezone:</div>
+                <div class="value" id="timezone"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">UTC Offset:</div>
+                <div class="value" id="utc-offset"></div>
+            </div>
+        </div>
+
+        <div class="date-box">
+            <h2>Test Trends Data</h2>
+            <div class="date-item">
+                <div class="label">Sample date_jst:</div>
+                <div class="value" id="sample-date-jst"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">Sample collected_at:</div>
+                <div class="value" id="sample-collected-at"></div>
+            </div>
+            <div class="date-item">
+                <div class="label">Sample CSV filename:</div>
+                <div class="value" id="sample-csv-filename"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateDates() {
+            const now = new Date();
+            
+            // Basic formats
+            document.getElementById('js-date').textContent = now.toString();
+            document.getElementById('iso-date').textContent = now.toISOString();
+            document.getElementById('vi-date').textContent = now.toLocaleDateString('vi-VN');
+            document.getElementById('ymd-date').textContent = now.toISOString().split('T')[0];
+            
+            // Timestamp format
+            const timestamp = now.toISOString().replace(/[-:T]/g, '').split('.')[0];
+            document.getElementById('timestamp-date').textContent = timestamp;
+            
+            // Timezone info
+            document.getElementById('timezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            document.getElementById('utc-offset').textContent = now.getTimezoneOffset() + ' minutes';
+            
+            // Sample trends data
+            const today = now.toISOString().split('T')[0];
+            const timestamp2 = now.toISOString();
+            const csvFilename = `trends_data/trends_${today.replace(/-/g, '')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}00.csv`;
+            
+            document.getElementById('sample-date-jst').textContent = today;
+            document.getElementById('sample-collected-at').textContent = timestamp2;
+            document.getElementById('sample-csv-filename').textContent = csvFilename;
+        }
+
+        // Update on load
+        updateDates();
+        
+        // Update every second
+        setInterval(updateDates, 1000);
+    </script>
+</body>
+</html>

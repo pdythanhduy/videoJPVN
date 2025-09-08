@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Trends Tool</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            background: #1a1a1a;
+            color: white;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .result {
+            background: #1f2937;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+        .success {
+            background: #14532d;
+            color: #86efac;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Trends Tool</h1>
+        
+        <div class="test-section">
+            <h2>1. Test Backend Connection</h2>
+            <button class="btn" onclick="testBackend()">Test Backend</button>
+            <div id="backend-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Test Trends API</h2>
+            <button class="btn" onclick="testTrendsAPI()">Test Trends Collection</button>
+            <div id="trends-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test Regions API</h2>
+            <button class="btn" onclick="testRegionsAPI()">Get Available Regions</button>
+            <div id="regions-result" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Test Platforms API</h2>
+            <button class="btn" onclick="testPlatformsAPI()">Get Available Platforms</button>
+            <div id="platforms-result" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        function showResult(elementId, content, isError = false) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.textContent = content;
+        }
+
+        async function testBackend() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('backend-result', `✅ Backend is running!\n\nResponse: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult('backend-result', `❌ Backend connection failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testTrendsAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/api/trends/collect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        regions: ['worldwide'],
+                        limit: 5,
+                        include_tiktok_songs: false,
+                        exclude_platforms: []
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                showResult('trends-result', `✅ Trends collection successful!\n\nResponse: ${JSON.stringify(data, null, 2)}`);
+            } catch (error) {
+                showResult('trends-result', `❌ Trends collection failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testRegionsAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/api/trends/regions`);
+                const data = await response.json();
+                showResult('regions-result', `✅ Regions API working!\n\nAvailable regions: ${data.regions.join(', ')}`);
+            } catch (error) {
+                showResult('regions-result', `❌ Regions API failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        async function testPlatformsAPI() {
+            try {
+                const response = await fetch(`${API_BASE}/api/trends/platforms`);
+                const data = await response.json();
+                showResult('platforms-result', `✅ Platforms API working!\n\nAvailable platforms: ${data.platforms.join(', ')}`);
+            } catch (error) {
+                showResult('platforms-result', `❌ Platforms API failed!\n\nError: ${error.message}`, true);
+            }
+        }
+
+        // Auto-test backend on load
+        window.addEventListener('load', () => {
+            setTimeout(testBackend, 1000);
+        });
+    </script>
+</body>
+</html>
