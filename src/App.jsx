@@ -1532,7 +1532,13 @@ export default function JPVideoSubApp() {
     }
 
     function drawOverlayFrame(nowTime) {
+      // Clear canvas completely to prevent old frames
       ctx.clearRect(0, 0, width, height);
+      
+      // Fill with black background first to prevent old frame artifacts
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+      
       console.log('Drawing frame at time:', nowTime, 'hasVideo:', hasVideo);
       if (hasVideo) {
         ctx.drawImage(vid, 0, 0, width, height);
@@ -1577,21 +1583,20 @@ export default function JPVideoSubApp() {
       
       if (!seg) {
         console.log('No segment found at time:', nowTime, 'tNow:', tNow, 'segIdx:', segIdx);
-        // Don't return early - continue to draw the last segment if available
+        // Only use last segment if we're within 2 seconds of its end
         if (data.segments && data.segments.length > 0) {
           const lastSeg = data.segments[data.segments.length - 1];
-          console.log('Using last segment:', lastSeg.jp, 'end time:', lastSeg.end);
-          // Continue with last segment for a few more seconds
           if (tNow <= lastSeg.end + 2) {
-            // Use last segment
-            actualSegIdx = data.segments.length - 1;
+            console.log('Using last segment with extension:', lastSeg.jp, 'end time:', lastSeg.end, 'current time:', tNow);
             seg = lastSeg;
-            console.log('Drawing last segment:', actualSegIdx, 'jp:', seg.jp, 'vi:', seg.vi, 'tokens:', seg.tokens?.length);
+            actualSegIdx = data.segments.length - 1;
           } else {
-            return;
+            console.log('Beyond last segment extension, skipping frame');
+            return; // Skip frame to prevent repetition
           }
         } else {
-          return;
+          console.log('No segments available, skipping frame');
+          return; // Skip frame
         }
       } else {
         console.log('Drawing segment:', actualSegIdx, 'jp:', seg.jp, 'vi:', seg.vi, 'tokens:', seg.tokens?.length);
@@ -1798,10 +1803,47 @@ export default function JPVideoSubApp() {
           const itemHeight = Math.round(80 * scale);
           const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
           const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+          
+          // Calculate actual content height needed for each vocabulary item
+          const titleHeight = Math.round(30 * scale); // Reduced title height
+          const itemSpacing = Math.round(8 * scale); // Reduced spacing
+          
+          // Calculate dynamic item height based on content length - more compact
+          let maxItemHeight = Math.round(60 * scale); // Reduced base item height
+          
+          // Check if any vocabulary items have long content that needs more space
+          vocabEntries.forEach(entry => {
+            const jpText = entry.surface || '';
+            const readingText = entry.reading || '';
+            const viText = entry.vi || '';
+            
+            // Estimate text height based on content length - more conservative
+            const jpLines = Math.ceil(jpText.length / 10); // More characters per line
+            const readingLines = Math.ceil(readingText.length / 15); // More characters per line
+            const viLines = Math.ceil(viText.length / 18); // More characters per line
+            
+            const totalLines = Math.max(1, jpLines) + Math.max(1, readingLines) + Math.max(1, viLines);
+            const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(12 * scale)) + Math.round(6 * scale); // Reduced padding and line height
+            
+            maxItemHeight = Math.max(maxItemHeight, estimatedHeight);
+          });
+          
+          // Calculate total height needed for ALL content - no artificial limits
+          const contentHeight = titleHeight + (rows * maxItemHeight) + ((rows - 1) * itemSpacing) + Math.round(40 * scale); // Extra padding
+          
+          // Use the full calculated height - no artificial limits
           vocabPanelHeight = Math.max(
-            Math.round(60 * scale) + (rows * (itemHeight + Math.round(12 * scale))),
-            Math.round(100 * scale)
+            contentHeight,
+            Math.round(100 * scale) // Minimum height
           );
+          
+          console.log('Height calculation (no limits):', {
+            contentHeight: contentHeight,
+            vocabPanelHeight: vocabPanelHeight,
+            rows: rows,
+            maxItemHeight: maxItemHeight,
+            totalEntries: vocabEntries.length
+          });
           
           // Position vocabulary panel below subtitle, full width
           const gap = Math.round(20 * scale);
@@ -1809,20 +1851,59 @@ export default function JPVideoSubApp() {
           vocabPanelY = boxY + boxH + gap; // Below subtitle
           
           
-          // Always move subtitle up to make room for vocabulary
-          const requiredSpace = vocabPanelHeight + gap + Math.round(50 * scale); // Extra margin
-          const availableSpace = height - boxY - boxH;
+          // Smart layout: balance subtitle and vocabulary space
+          const totalContentHeight = boxH + gap + vocabPanelHeight;
+          const availableHeight = height - Math.round(20 * scale); // Leave 20px margin
           
-          if (requiredSpace > availableSpace) {
-            const moveUp = requiredSpace - availableSpace;
-            boxY = Math.max(Math.round(20 * scale), boxY - moveUp);
+          if (totalContentHeight > availableHeight) {
+            console.log('Content too tall, using smart layout:', {
+              totalContentHeight: totalContentHeight,
+              availableHeight: availableHeight,
+              subtitleHeight: boxH,
+              vocabHeight: vocabPanelHeight
+            });
+            
+            // Calculate proportional space allocation
+            const subtitleRatio = boxH / totalContentHeight;
+            const vocabRatio = vocabPanelHeight / totalContentHeight;
+            
+            // Allocate space proportionally
+            const allocatedSubtitleHeight = Math.floor(availableHeight * subtitleRatio);
+            const allocatedVocabHeight = Math.floor(availableHeight * vocabRatio);
+            
+            // Adjust subtitle height if needed
+            if (allocatedSubtitleHeight < boxH) {
+              boxH = Math.max(allocatedSubtitleHeight, Math.round(40 * scale)); // Minimum subtitle height
+              console.log('Reduced subtitle height to:', boxH);
+            }
+            
+            // Adjust vocabulary panel height if needed
+            if (allocatedVocabHeight < vocabPanelHeight) {
+              vocabPanelHeight = Math.max(allocatedVocabHeight, Math.round(60 * scale)); // Minimum vocab height
+              console.log('Reduced vocabulary height to:', vocabPanelHeight);
+            }
+            
+            // Position elements to fit
+            boxY = Math.round(10 * scale); // Start from top
             vocabPanelY = boxY + boxH + gap;
-          }
-          
-          // Ensure vocabulary panel is within screen bounds
-          const maxVocabY = height - Math.round(100 * scale);
-          if (vocabPanelY > maxVocabY) {
-            vocabPanelY = Math.max(Math.round(20 * scale), maxVocabY - Math.round(200 * scale));
+            
+            // Final check: if still too tall, use scroll-like behavior
+            const finalBottom = vocabPanelY + vocabPanelHeight;
+            if (finalBottom > height - Math.round(10 * scale)) {
+              const overflow = finalBottom - (height - Math.round(10 * scale));
+              vocabPanelY = Math.max(boxY + boxH + gap, vocabPanelY - overflow);
+              console.log('Adjusted vocabulary position due to overflow:', vocabPanelY);
+            }
+          } else {
+            // Normal layout - move subtitle up to make room
+            const requiredSpace = vocabPanelHeight + gap + Math.round(30 * scale);
+            const availableSpace = height - boxY - boxH;
+            
+            if (requiredSpace > availableSpace) {
+              const moveUp = requiredSpace - availableSpace + Math.round(20 * scale);
+              boxY = Math.max(Math.round(10 * scale), boxY - moveUp);
+              vocabPanelY = boxY + boxH + gap;
+            }
           }
           
           // Adjust subtitle width to make room for vocabulary
@@ -1918,76 +1999,238 @@ export default function JPVideoSubApp() {
         const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
         const rows = Math.ceil(vocabEntries.length / itemsPerRow);
         
+        // Calculate dynamic item height based on content length - compact version
+        let maxItemHeight = Math.round(60 * scale); // Reduced base item height
+        vocabEntries.forEach(entry => {
+          const jpText = entry.surface || '';
+          const readingText = entry.reading || '';
+          const viText = entry.vi || '';
+          
+          // More conservative line estimation for compact display
+          const jpLines = Math.ceil(jpText.length / 10);
+          const readingLines = Math.ceil(readingText.length / 15);
+          const viLines = Math.ceil(viText.length / 18);
+          
+          const totalLines = Math.max(1, jpLines) + Math.max(1, readingLines) + Math.max(1, viLines);
+          const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(12 * scale)) + Math.round(6 * scale);
+          
+          maxItemHeight = Math.max(maxItemHeight, estimatedHeight);
+        });
+        
+        console.log('Calculated maxItemHeight:', maxItemHeight, 'scale:', scale);
+        
         // Test rectangle to ensure drawing works
         ctx.fillStyle = 'rgba(255,0,0,0.5)';
         ctx.fillRect(vocabPanelX, vocabPanelY, vocabPanelWidth, 50);
         console.log('Drew test red rectangle at:', vocabPanelX, vocabPanelY, vocabPanelWidth, 50);
         
-        // Panel background
-        ctx.fillStyle = `rgba(0,0,0,${bgAlpha * 0.9})`;
-        roundRect(ctx, vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight, Math.max(12, Math.round(16 * scale)));
-        ctx.fill();
-        console.log('Drew vocab panel background at:', vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight);
+        // Panel background with margin and padding
+        const margin = Math.round(8 * scale); // Margin around vocabulary content
+        const bottomPadding = Math.round(12 * scale);
+        const backgroundHeight = vocabPanelHeight + bottomPadding + (margin * 2);
+        const backgroundY = vocabPanelY - margin;
         
-        // Panel border
+        ctx.fillStyle = `rgba(0,0,0,${bgAlpha * 0.9})`;
+        roundRect(ctx, vocabPanelX, backgroundY, vocabPanelWidth, backgroundHeight, Math.max(12, Math.round(16 * scale)));
+        ctx.fill();
+        console.log('Drew vocab panel background at:', vocabPanelX, backgroundY, vocabPanelWidth, backgroundHeight);
+        
+        // Panel border with margin and padding
         ctx.strokeStyle = 'rgba(59,130,246,0.7)';
         ctx.lineWidth = Math.max(2, Math.round(2 * scale));
-        roundRect(ctx, vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight, Math.max(12, Math.round(16 * scale)));
+        roundRect(ctx, vocabPanelX, backgroundY, vocabPanelWidth, backgroundHeight, Math.max(12, Math.round(16 * scale)));
         ctx.stroke();
         console.log('Drew vocab panel border');
         
-        // Title
+        // Title with margin adjustment
         ctx.textAlign = 'center';
         ctx.font = `700 ${Math.max(14 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
         ctx.fillStyle = '#fbbf24';
-        const titleY = vocabPanelY + Math.round(18 * scale);
+        const titleY = vocabPanelY + Math.round(18 * scale) + margin;
         ctx.fillText(`📚 Từ vựng (${vocabEntries.length})`, vocabPanelX + vocabPanelWidth / 2, titleY);
         console.log('Drew vocab title at:', vocabPanelX + vocabPanelWidth / 2, titleY);
         
-        // Vocabulary items - horizontal grid, full width, large text
+        // Vocabulary items - horizontal grid, full width, large text with margin
         const itemPadding = Math.round(16 * scale);
         
-        const startX = vocabPanelX + itemPadding;
+        const startX = vocabPanelX + itemPadding + margin;
         const startY = titleY + Math.round(20 * scale);
+        
+        // No height calculations or limits - draw everything
+        console.log('Vocabulary layout (no limits):', {
+          totalEntries: vocabEntries.length,
+          itemsPerRow: itemsPerRow,
+          itemHeight: maxItemHeight,
+          vocabPanelHeight: vocabPanelHeight,
+          vocabPanelY: vocabPanelY
+        });
+        
+        // Draw vocabulary items with smart overflow handling
+        console.log(`Drawing vocabulary items with smart layout`);
+        
+        let actuallyDrawn = 0;
+        let skippedCount = 0;
         
         vocabEntries.forEach((entry, idx) => {
           const row = Math.floor(idx / itemsPerRow);
           const col = idx % itemsPerRow;
           const x = startX + col * (itemWidth + Math.round(12 * scale));
-          const y = startY + row * (itemHeight + Math.round(12 * scale));
+          const y = startY + row * (maxItemHeight + Math.round(12 * scale));
           
-          console.log(`Drawing vocab item ${idx}:`, entry.surface, 'at', x, y);
+          // Check if item would be outside the allocated vocabulary panel area
+          const vocabPanelBottom = vocabPanelY + vocabPanelHeight;
+          const screenBottom = height - Math.round(10 * scale);
+          const maxY = Math.min(vocabPanelBottom, screenBottom);
+          
+          if (y + maxItemHeight > maxY) {
+            skippedCount++;
+            console.log(`Skipping vocab item ${idx} - would exceed allocated space. Y: ${y}, maxY: ${maxY}, itemHeight: ${maxItemHeight}`);
+            
+            // If we're skipping too many items, show a "..." indicator
+            if (skippedCount === 1 && idx < vocabEntries.length - 1) {
+              const remainingItems = vocabEntries.length - idx;
+              console.log(`... and ${remainingItems} more vocabulary items`);
+            }
+            return;
+          }
+          
+          actuallyDrawn++;
+          console.log(`Drawing vocab item ${idx}:`, entry.surface, 'at', x, y, 'height:', maxItemHeight);
           
           // Item background
           ctx.fillStyle = 'rgba(59,130,246,0.15)';
-          roundRect(ctx, x, y, itemWidth, itemHeight, Math.max(8, Math.round(12 * scale)));
+          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(12 * scale)));
           ctx.fill();
           
           // Item border
           ctx.strokeStyle = 'rgba(59,130,246,0.5)';
           ctx.lineWidth = Math.max(2, Math.round(2 * scale));
-          roundRect(ctx, x, y, itemWidth, itemHeight, Math.max(8, Math.round(12 * scale)));
+          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(12 * scale)));
           ctx.stroke();
           
-          // Japanese text - larger and bolder
-          ctx.textAlign = 'center';
-          ctx.font = `700 ${Math.max(16 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
-          ctx.fillStyle = '#ffffff';
-          ctx.fillText(entry.surface, x + itemWidth / 2, y + Math.round(20 * scale));
+          // Calculate text positions based on dynamic height with proper wrapping - compact
+          const textStartY = y + Math.round(15 * scale);
+          const lineHeight = Math.round(12 * scale);
+          const itemPadding = Math.round(12 * scale);
+          const availableWidth = itemWidth - (itemPadding * 2);
           
-          // Reading - larger
-          if (entry.reading) {
-            ctx.font = `500 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
-            ctx.fillStyle = '#e4e4e7';
-            ctx.fillText(entry.reading, x + itemWidth / 2, y + Math.round(40 * scale));
+          let currentY = textStartY;
+          
+          // Japanese text - compact size with wrapping
+          ctx.textAlign = 'center';
+          ctx.font = `700 ${Math.max(14 * scale, subFontSize * scale * 0.8)}px ${fontFamily}`;
+          ctx.fillStyle = '#ffffff';
+          
+          // Wrap Japanese text if too long
+          const jpText = entry.surface || '';
+          if (jpText.length > 8) {
+            // Split long text into multiple lines
+            const words = jpText.split('');
+            let line = '';
+            let lines = [];
+            
+            for (const char of words) {
+              const testLine = line + char;
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > availableWidth && line.length > 0) {
+                lines.push(line);
+                line = char;
+              } else {
+                line = testLine;
+              }
+            }
+            if (line.length > 0) lines.push(line);
+            
+            // Draw each line
+            lines.forEach((line, idx) => {
+              ctx.fillText(line, x + itemWidth / 2, currentY + (idx * lineHeight));
+            });
+            currentY += lines.length * lineHeight;
+          } else {
+            ctx.fillText(jpText, x + itemWidth / 2, currentY);
+            currentY += lineHeight;
           }
           
-          // Vietnamese meaning - larger and bolder
-          ctx.font = `600 ${Math.max(14 * scale, subFontSize * scale * 0.8)}px ${fontFamily}`;
+          // Reading - compact size with wrapping
+          if (entry.reading) {
+            ctx.font = `500 ${Math.max(10 * scale, subFontSize * scale * 0.6)}px ${fontFamily}`;
+            ctx.fillStyle = '#e4e4e7';
+            
+            const readingText = entry.reading;
+            if (readingText.length > 12) {
+              // Split long reading text
+              const words = readingText.split('');
+              let line = '';
+              let lines = [];
+              
+              for (const char of words) {
+                const testLine = line + char;
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > availableWidth && line.length > 0) {
+                  lines.push(line);
+                  line = char;
+                } else {
+                  line = testLine;
+                }
+              }
+              if (line.length > 0) lines.push(line);
+              
+              lines.forEach((line, idx) => {
+                ctx.fillText(line, x + itemWidth / 2, currentY + (idx * lineHeight));
+              });
+              currentY += lines.length * lineHeight;
+            } else {
+              ctx.fillText(readingText, x + itemWidth / 2, currentY);
+              currentY += lineHeight;
+            }
+          }
+          
+          // Vietnamese meaning - compact size with wrapping
+          ctx.font = `600 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
           ctx.fillStyle = '#10b981';
-          ctx.fillText(entry.vi, x + itemWidth / 2, y + Math.round(60 * scale));
+          
+          const viText = entry.vi || '';
+          if (viText.length > 15) {
+            // Split long Vietnamese text
+            const words = viText.split(' ');
+            let line = '';
+            let lines = [];
+            
+            for (const word of words) {
+              const testLine = line + (line.length > 0 ? ' ' : '') + word;
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > availableWidth && line.length > 0) {
+                lines.push(line);
+                line = word;
+              } else {
+                line = testLine;
+              }
+            }
+            if (line.length > 0) lines.push(line);
+            
+            lines.forEach((line, idx) => {
+              ctx.fillText(line, x + itemWidth / 2, currentY + (idx * lineHeight));
+            });
+          } else {
+            ctx.fillText(viText, x + itemWidth / 2, currentY);
+          }
         });
-        console.log('Finished drawing all vocab items');
+        
+        // Show indicator if some vocabulary items were skipped
+        if (skippedCount > 0) {
+          const indicatorY = vocabPanelY + vocabPanelHeight - Math.round(15 * scale);
+          const indicatorX = vocabPanelX + vocabPanelWidth - Math.round(100 * scale);
+          
+          // Draw "..." indicator
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          ctx.font = `600 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
+          ctx.textAlign = 'right';
+          ctx.fillText(`... +${skippedCount} more`, indicatorX, indicatorY);
+          
+          console.log(`Drew overflow indicator: +${skippedCount} more items`);
+        }
+        
+        console.log(`Finished drawing ${actuallyDrawn} vocabulary items out of ${vocabEntries.length} total (${skippedCount} skipped due to space constraints)`);
       }
 
       // Optional: draw current time debug marker for multi-sentence verification

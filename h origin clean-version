@@ -1,0 +1,5 @@
+[33mb6e853c[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mclean-version[m[33m)[m feat: add AI Video Tool and Video Review features, including fixes guide, auto-buy script for Apple Store, and encoding improvements
+[33mb9dd1b7[m Remove outdated guides and scripts related to audio processing, YouTube downloading, and STT conversion from the backend, streamlining the project structure.
+[33m56b52c2[m[33m ([m[1;32mmain[m[33m)[m Remove Azure Speech Key from code - use environment variables
+[33m0e7c479[m feat: add comprehensive guides and backend scripts for audio processing, YouTube downloading, and STT conversion
+[33mb389465[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: enhance JP–VI subtitle app with new ImageVideo page, audio handling, and vocabulary export features
