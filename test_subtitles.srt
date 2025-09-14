@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:05,000
+Xin chào các bạn
+
+2
+00:00:05,000 --> 00:00:10,000
+Hôm nay mình sẽ review sản phẩm này
+
+3
+00:00:10,000 --> 00:00:15,000
+Đây là một sản phẩm rất tuyệt vời
+
+4
+00:00:15,000 --> 00:00:20,000
+Chất lượng rất tốt và giá cả hợp lý
+
+5
+00:00:20,000 --> 00:00:25,000
+Mình khuyên các bạn nên thử sản phẩm này
+
+6
+00:00:25,000 --> 00:00:30,000
+Cảm ơn các bạn đã xem video
+
+7
+00:00:30,000 --> 00:00:35,000
+Đừng quên like và subscribe nhé
+
+8
+00:00:35,000 --> 00:00:40,000
+Hẹn gặp lại các bạn trong video tiếp theo
+
+9
+00:00:40,000 --> 00:00:45,000
+Chúc các bạn một ngày tốt lành

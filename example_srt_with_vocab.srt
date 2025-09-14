@@ -1,0 +1,41 @@
+1
+00:00:00,000 --> 00:00:03,000
+お疲れ様です
+"お疲れ様です" là một lời chào mà người Nhật sử dụng hằng ngày ở nơi làm việc hay trường học.
+
+<!-- VOCAB:
+  お疲れ様 (つかれさま): cảm ơn vì công việc
+  言葉 (ことば): từ ngữ
+  日本人 (にっぽんにん): người Nhật
+  職場 (しょくば): nơi làm việc
+  学校 (がっこう): trường học
+  毎日 (まいにち): mỗi ngày
+  挨拶 (あいさつ): lời chào
+-->
+
+2
+00:00:03,000 --> 00:00:06,000
+直訳すると「お疲れ様」というのは「疲れている様子」という意味ですが、実際の使い方はもっと広いです。
+Nếu dịch sát nghĩa, "お疲れ様" có nghĩa là "trông có vẻ mệt mỏi", nhưng cách dùng thực tế rộng hơn nhiều.
+
+<!-- VOCAB:
+  直訳 (ちょくやく): dịch sát nghĩa
+  様子 (ようす): tình trạng
+  意味 (いみ): ý nghĩa
+  実際 (じっさい): thực tế
+  使い方 (つかいかた): cách sử dụng
+  広い (ひろい): rộng
+-->
+
+3
+00:00:06,000 --> 00:00:09,000
+まず、仕事が終わった人に対して「今日も頑張ったね」「ありがとう」という気持ちを込めて使います。
+Trước hết, cụm từ này được dùng để bày tỏ "Hôm nay bạn đã cố gắng rồi, cảm ơn nhé" với người vừa kết thúc công việc.
+
+<!-- VOCAB:
+  仕事 (しごと): công việc
+  人 (ひと): người
+  今日 (きょう): hôm nay
+  気持ち (きもち): cảm xúc
+  使います (つかいます): sử dụng
+-->

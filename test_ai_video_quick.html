@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Video Test - Quick</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #dc3545;
+            color: white;
+        }
+        .success {
+            background: #28a745;
+            color: white;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #555;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 AI Video Test - Quick</h1>
+    
+    <div class="container">
+        <h2>1. Test Backend Connection</h2>
+        <button onclick="testConnection()">Test Connection</button>
+        <div id="connectionResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>2. Test AI Video Generation</h2>
+        <input type="text" id="prompt" placeholder="Enter video prompt..." value="A cat playing with a ball of yarn">
+        <br>
+        <input type="number" id="duration" value="5" min="3" max="30">
+        <br>
+        <button onclick="generateVideo()">Generate Video (Demo Mode)</button>
+        <div id="videoResult" class="result"></div>
+    </div>
+
+    <div class="container">
+        <h2>3. Test All Endpoints</h2>
+        <button onclick="testAllEndpoints()">Test All Endpoints</button>
+        <div id="allResults" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        async function testConnection() {
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.textContent = 'Testing connection...';
+            resultDiv.className = 'result';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/ai-video/platforms`);
+                const data = await response.json();
+                
+                resultDiv.textContent = `✅ Connection OK!\nStatus: ${response.status}\nData: ${JSON.stringify(data, null, 2)}`;
+                resultDiv.className = 'result success';
+            } catch (error) {
+                resultDiv.textContent = `❌ Connection Failed!\nError: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function generateVideo() {
+            const resultDiv = document.getElementById('videoResult');
+            const prompt = document.getElementById('prompt').value;
+            const duration = document.getElementById('duration').value;
+
+            if (!prompt.trim()) {
+                resultDiv.textContent = '❌ Please enter a prompt!';
+                resultDiv.className = 'result error';
+                return;
+            }
+
+            resultDiv.textContent = '🎬 Generating video...';
+            resultDiv.className = 'result';
+
+            try {
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('duration', duration);
+                formData.append('platform', 'demo');
+                formData.append('style', 'realistic');
+                formData.append('aspect_ratio', '16:9');
+
+                console.log('Sending request...');
+                const startTime = Date.now();
+
+                const response = await fetch(`${API_BASE}/api/ai-video/generate`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const endTime = Date.now();
+                const duration_ms = endTime - startTime;
+
+                console.log(`Response received in ${duration_ms}ms`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.textContent = `✅ Video Generated Successfully!\nTime: ${duration_ms}ms\n\nResult:\n${JSON.stringify(data, null, 2)}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.textContent = `❌ Generation Failed!\nError: ${data.error}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ Error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testAllEndpoints() {
+            const resultDiv = document.getElementById('allResults');
+            resultDiv.textContent = 'Testing all endpoints...';
+            resultDiv.className = 'result';
+
+            const endpoints = [
+                '/api/ai-video/platforms',
+                '/api/ai-video/styles',
+                '/api/ai-video/aspect-ratios',
+                '/api/ai-video/files'
+            ];
+
+            let results = '';
+
+            for (const endpoint of endpoints) {
+                try {
+                    const response = await fetch(`${API_BASE}${endpoint}`);
+                    const data = await response.json();
+                    results += `✅ ${endpoint}: OK (${response.status})\n`;
+                } catch (error) {
+                    results += `❌ ${endpoint}: FAILED - ${error.message}\n`;
+                }
+            }
+
+            resultDiv.textContent = results;
+            resultDiv.className = 'result';
+        }
+
+        // Auto-test connection on load
+        window.onload = function() {
+            testConnection();
+        };
+    </script>
+</body>
+</html>

@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // Local STT (no API)
 let localTranscribePipeline = null;
-import { Link } from 'react-router-dom';
 import * as wanakana from 'wanakana';
-import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, FileText, TrendingUp, Video } from "lucide-react";
+import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, VolumeX, Volume1, FileText, TrendingUp, RotateCcw, FastForward, Rewind } from "lucide-react";
 import "./App.css";
+import { jpViDict } from './jp-vi-dictionary.js';
 import TTSPanel from './components/TTSPanel';
 import AudioFilesList from './components/AudioFilesList';
 import YouTubeDownloader from './components/YouTubeDownloader';
 import STTConverter from './components/STTConverter';
 import YouTubeTester from './components/YouTubeTester';
 import TrendsToolSimple from './components/TrendsToolSimple';
-import AIVideoTool from './components/AIVideoTool';
 
 // =============================================================
 // JP–VI Video Sub App (React) – Furigana + POS Highlight
@@ -71,21 +70,21 @@ const DEMO_DATA = {
       jp: "最近、映画を見ましたか。はい、先週友だちとアクション映画を見ました。",
       vi: "Gần đây bạn có xem phim không? Có, tuần trước tôi đi xem phim hành động với bạn.",
       tokens: [
-        { surface: "最近", reading: "さいきん", romaji: "saikin", pos: "NOUN", t: 0.2 },
+        { surface: "最近", reading: "さいきん", romaji: "saikin", pos: "NOUN", vi: "gần đây", t: 0.2 },
         { surface: "、", reading: "、", romaji: "", pos: "PUNCT", t: 0.35 },
-        { surface: "映画", reading: "えいが", romaji: "eiga", pos: "NOUN", t: 0.6 },
+        { surface: "映画", reading: "えいが", romaji: "eiga", pos: "NOUN", vi: "phim", t: 0.6 },
         { surface: "を", reading: "を", romaji: "o", pos: "PARTICLE", t: 0.9 },
-        { surface: "見ました", reading: "みました", romaji: "mimashita", pos: "VERB", t: 1.2 },
+        { surface: "見ました", reading: "みました", romaji: "mimashita", pos: "VERB", vi: "đã xem", t: 1.2 },
         { surface: "か", reading: "か", romaji: "ka", pos: "PARTICLE", t: 1.6 },
         { surface: "。", reading: "。", romaji: "", pos: "PUNCT", t: 2.0 },
         { surface: "はい", reading: "はい", romaji: "hai", pos: "EXPR", t: 2.3 },
         { surface: "、", reading: "、", romaji: "", pos: "PUNCT", t: 2.5 },
-        { surface: "先週", reading: "せんしゅう", romaji: "senshuu", pos: "NOUN", t: 2.8 },
-        { surface: "友だち", reading: "ともだち", romaji: "tomodachi", pos: "NOUN", t: 3.1 },
+        { surface: "先週", reading: "せんしゅう", romaji: "senshuu", pos: "NOUN", vi: "tuần trước", t: 2.8 },
+        { surface: "友だち", reading: "ともだち", romaji: "tomodachi", pos: "NOUN", vi: "bạn bè", t: 3.1 },
         { surface: "と", reading: "と", romaji: "to", pos: "PARTICLE", t: 3.4 },
-        { surface: "アクション映画", reading: "あくしょんえいが", romaji: "akushon eiga", pos: "NOUN", t: 3.7 },
+        { surface: "アクション映画", reading: "あくしょんえいが", romaji: "akushon eiga", pos: "NOUN", vi: "phim hành động", t: 3.7 },
         { surface: "を", reading: "を", romaji: "o", pos: "PARTICLE", t: 4.2 },
-        { surface: "見ました", reading: "みました", romaji: "mimashita", pos: "VERB", t: 4.6 },
+        { surface: "見ました", reading: "みました", romaji: "mimashita", pos: "VERB", vi: "đã xem", t: 4.6 },
         { surface: "。", reading: "。", romaji: "", pos: "PUNCT", t: 5.2 },
       ],
     },
@@ -95,18 +94,19 @@ const DEMO_DATA = {
       jp: "昨日、友だちと大阪へ行きました。",
       vi: "Hôm qua tôi đã đi Osaka với bạn.",
       tokens: [
-        { surface: "昨日", reading: "きのう", romaji: "kinou", pos: "NOUN", t: 0.1 },
+        { surface: "昨日", reading: "きのう", romaji: "kinou", pos: "NOUN", vi: "hôm qua", t: 0.1 },
         { surface: "、", reading: "、", romaji: "", pos: "PUNCT", t: 0.45 },
-        { surface: "友だち", reading: "ともだち", romaji: "tomodachi", pos: "NOUN", t: 0.8 },
+        { surface: "友だち", reading: "ともだち", romaji: "tomodachi", pos: "NOUN", vi: "bạn bè", t: 0.8 },
         { surface: "と", reading: "と", romaji: "to", pos: "PARTICLE", t: 1.2 },
-        { surface: "大阪", reading: "おおさか", romaji: "oosaka", pos: "PROPN", t: 1.6 },
+        { surface: "大阪", reading: "おおさか", romaji: "oosaka", pos: "PROPN", vi: "Osaka", t: 1.6 },
         { surface: "へ", reading: "へ", romaji: "e", pos: "PARTICLE", t: 2.0 },
-        { surface: "行きました", reading: "いきました", romaji: "ikimashita", pos: "VERB", t: 2.6 },
+        { surface: "行きました", reading: "いきました", romaji: "ikimashita", pos: "VERB", vi: "đã đi", t: 2.6 },
         { surface: "。", reading: "。", romaji: "", pos: "PUNCT", t: 3.5 },
       ],
     },
   ],
 };
+
 
 function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
@@ -245,6 +245,7 @@ export default function JPVideoSubApp() {
   const [showRomaji, setShowRomaji] = useState(false);
   const [showVietnamese, setShowVietnamese] = useState(true);
   const [posColors, setPosColors] = useState({ ...DEFAULT_POS_COLORS });
+  const [tokenByTokenMode, setTokenByTokenMode] = useState(false);
   const [rate, setRate] = useState(1);
   const [opacity, setOpacity] = useState(0.92);
   const [highlightOffset, setHighlightOffset] = useState(-0.5); // seconds, positive = highlight later
@@ -260,13 +261,39 @@ export default function JPVideoSubApp() {
   const [subCentered, setSubCentered] = useState(true);
   const [punctSkip, setPunctSkip] = useState(0.06); // seconds to skip into next token when inside punctuation
   const [highlightEnabled, setHighlightEnabled] = useState(true);
+  const [highlightMode, setHighlightMode] = useState('A'); // 'A' = backup mode, 'B' = custom mode
+  
+  // Highlight Mode B custom settings
+  const [highlightModeBEnabled, setHighlightModeBEnabled] = useState(true);
+  const [highlightModeBOffset, setHighlightModeBOffset] = useState(-0.3); // seconds
+  const [highlightModeBTokenLead, setHighlightModeBTokenLead] = useState(-0.15); // seconds
+  const [highlightModeBPunctSkip, setHighlightModeBPunctSkip] = useState(0.08); // seconds
+  const [highlightModeBIntensity, setHighlightModeBIntensity] = useState(1.5); // highlight intensity multiplier
+  const [highlightModeBColorScheme, setHighlightModeBColorScheme] = useState('enhanced'); // 'original' or 'enhanced'
+  
+  // Vocabulary editing
+  const [editingVocab, setEditingVocab] = useState(null); // {surface, vi, tokenIndex, segmentIndex}
+  const [customVocabDict, setCustomVocabDict] = useState({}); // Custom vocabulary dictionary
+  
+  // Audio controls
+  const [audioVolume, setAudioVolume] = useState(1.0); // 0.0 to 1.0
+  const [audioPlaybackRate, setAudioPlaybackRate] = useState(1.0); // 0.5 to 2.0
+  const [audioMuted, setAudioMuted] = useState(false);
+  const [audioLoop, setAudioLoop] = useState(false);
+  const [audioFadeIn, setAudioFadeIn] = useState(0); // seconds
+  const [audioFadeOut, setAudioFadeOut] = useState(0); // seconds
+  
+  // Auto pause between sentences
+  const [autoPauseEnabled, setAutoPauseEnabled] = useState(false);
+  const [pauseDuration, setPauseDuration] = useState(5.0); // seconds
+  const [isAutoPaused, setIsAutoPaused] = useState(false);
+  
   const [ttsOpen, setTtsOpen] = useState(false);
   const [audioFilesOpen, setAudioFilesOpen] = useState(false);
   const [youtubeOpen, setYoutubeOpen] = useState(false);
   const [sttOpen, setSttOpen] = useState(false);
   const [youtubeTestOpen, setYoutubeTestOpen] = useState(false);
   const [trendsOpen, setTrendsOpen] = useState(false);
-  const [aiVideoOpen, setAiVideoOpen] = useState(false);
 
   // STT (Audio -> SRT)
   const [sttApiKey, setSttApiKey] = useState('');
@@ -276,6 +303,29 @@ export default function JPVideoSubApp() {
   const [sttLoading, setSttLoading] = useState(false);
   const [sttResult, setSttResult] = useState('');
   const [sttError, setSttError] = useState('');
+
+  // Sync audio controls when media loads
+  useEffect(() => {
+    const a = audioMainRef.current;
+    const v = videoRef.current;
+    if (a) {
+      try {
+        a.volume = audioVolume;
+        a.muted = audioMuted;
+        a.loop = audioLoop;
+        a.playbackRate = audioPlaybackRate;
+      } catch {}
+    }
+    if (v) {
+      try {
+        v.volume = audioVolume;
+        v.muted = audioMuted;
+        v.loop = audioLoop;
+        v.playbackRate = audioPlaybackRate;
+      } catch {}
+    }
+  }, [audioVolume, audioMuted, audioLoop, audioPlaybackRate, videoURL]);
+
 
   // Build kuromoji tokenizer once (dynamic import to avoid bundling issues)
   useEffect(() => {
@@ -303,9 +353,10 @@ export default function JPVideoSubApp() {
     setData(prev => {
       const src = prev?.segments ? prev : data;
       const segments = (src.segments || []).map((seg) => {
-        const tokens = buildTokensFromJP(seg.jp || '');
+        const baseTokens = buildTokensFromJP(seg.jp || '');
+        const tokens = buildChunks(baseTokens);
         const enriched = { ...seg, tokens };
-        addTokenTimings(enriched);
+        addChunkTimings(enriched);
         return enriched;
       });
       return normalizeData({ segments });
@@ -403,7 +454,27 @@ export default function JPVideoSubApp() {
     return () => cancelAnimationFrame(id);
   }, [playing, demo, rate, demoDuration]);
 
-  const now = simTime + highlightOffset;
+  // Calculate highlight timing based on selected mode
+  const getHighlightTiming = () => {
+    if (highlightMode === 'A') {
+      return {
+        offset: highlightOffset,
+        tokenLead: tokenLead,
+        punctSkip: punctSkip,
+        enabled: highlightEnabled
+      };
+    } else {
+      return {
+        offset: highlightModeBOffset,
+        tokenLead: highlightModeBTokenLead,
+        punctSkip: highlightModeBPunctSkip,
+        enabled: highlightModeBEnabled
+      };
+    }
+  };
+
+  const highlightTiming = getHighlightTiming();
+  const now = simTime + highlightTiming.offset;
 
   // Tìm segment hiện tại theo thời gian
   const currentSegIndex = useMemo(() => {
@@ -411,13 +482,63 @@ export default function JPVideoSubApp() {
     return data.segments.findIndex((s) => now >= s.start && now <= s.end);
   }, [data, now]);
 
+  // Reset auto-pause state when segment changes
+  useEffect(() => {
+    if (isAutoPaused) {
+      console.log('Resetting isAutoPaused because segment changed to:', currentSegIndex);
+      setIsAutoPaused(false);
+    }
+  }, [currentSegIndex]);
+
+  // Reset auto-pause state when starting to play
+  useEffect(() => {
+    if (playing && isAutoPaused) {
+      console.log('Resetting isAutoPaused because playing started');
+      setIsAutoPaused(false);
+    }
+  }, [playing]);
+
   const currentSeg = currentSegIndex >= 0 ? data.segments[currentSegIndex] : null;
+
+  // Auto pause between sentences
+  useEffect(() => {
+    if (!autoPauseEnabled || !playing || isAutoPaused) return;
+    
+    const currentSeg = data?.segments?.[currentSegIndex];
+    if (!currentSeg) return;
+    
+    // Debug log
+    console.log('Auto-pause check:', {
+      autoPauseEnabled,
+      playing,
+      isAutoPaused,
+      currentSegIndex,
+      simTime,
+      segEnd: currentSeg.end,
+      timeDiff: simTime - currentSeg.end
+    });
+    
+    // Check if we're at the end of current segment (with small tolerance)
+    const timeDiff = simTime - currentSeg.end;
+    if (timeDiff >= -0.1 && timeDiff <= 0.5) {
+      console.log('Auto-pausing at segment end:', currentSegIndex, 'simTime:', simTime, 'end:', currentSeg.end, 'diff:', timeDiff);
+      setIsAutoPaused(true);
+      setPlaying(false);
+      
+      // Auto resume after pause duration
+      setTimeout(() => {
+        console.log('Auto-resuming after pause');
+        setIsAutoPaused(false);
+        setPlaying(true);
+      }, pauseDuration * 1000);
+    }
+  }, [simTime, currentSegIndex, autoPauseEnabled, playing, isAutoPaused, pauseDuration, data]);
 
   // Tìm token gần nhất theo thời gian trong segment (dựa vào token.t)
   const currentTokenIndex = useMemo(() => {
     if (!currentSeg) return -1;
     const segOffset = segOffsets[currentSegIndex] || 0;
-    const rel = (now + tokenLead + segOffset) - currentSeg.start;
+    const rel = (now + highlightTiming.tokenLead + segOffset) - currentSeg.start;
     const tokens = currentSeg.tokens || [];
     if (!tokens.length) return -1;
     for (let i = 0; i < tokens.length; i++) {
@@ -432,7 +553,7 @@ export default function JPVideoSubApp() {
       if (rel >= start && rel < end) {
         if (!isPunctToken(tokens[i])) return i;
         // Within punctuation window: optionally jump to next non-punct after a small skip
-        if ((rel - start) >= punctSkip) {
+        if ((rel - start) >= highlightTiming.punctSkip) {
           for (let j = i + 1; j < tokens.length; j++) if (!isPunctToken(tokens[j])) return j;
         }
         // otherwise stick to previous non-punct for continuity
@@ -453,7 +574,7 @@ export default function JPVideoSubApp() {
       for (let j = bestIndex + 1; j < tokens.length; j++) if (!isPunctToken(tokens[j])) return j;
     }
     return bestIndex;
-  }, [currentSeg, now, tokenLead, segOffsets, currentSegIndex, punctSkip]);
+  }, [currentSeg, now, highlightTiming, segOffsets, currentSegIndex]);
 
   const activeToken = useMemo(() => {
     if (!currentSeg || currentTokenIndex < 0) return null;
@@ -466,20 +587,24 @@ export default function JPVideoSubApp() {
     const seen = new Set();
     const seg = currentSeg;
     if (!seg) return entries;
-    for (const tk of (seg.tokens || [])) {
+    for (let i = 0; i < (seg.tokens || []).length; i++) {
+      const tk = seg.tokens[i];
       const pos = String(tk?.pos || '').toUpperCase();
-      if (pos !== 'NOUN' && pos !== 'PROPN') continue;
+      if (pos !== 'NOUN' && pos !== 'PROPN' && pos !== 'VERB') continue;
       const surface = String(tk?.surface || '').trim();
       if (!surface || seen.has(surface)) continue;
       seen.add(surface);
+      const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
       entries.push({
         surface,
         reading: String(tk?.reading || '').trim(),
-        vi: String(tk?.vi || '').trim(),
+        vi,
+        tokenIndex: i,
+        segmentIndex: currentSegIndex
       });
     }
     return entries;
-  }, [currentSeg]);
+  }, [currentSeg, currentSegIndex, customVocabDict]);
 
   function downloadVocabCsv() {
     try {
@@ -564,7 +689,20 @@ export default function JPVideoSubApp() {
       try {
         const obj = JSON.parse(String(reader.result));
         if (!obj?.segments || !Array.isArray(obj.segments)) throw new Error("JSON không đúng schema (thiếu 'segments').");
-        setData(normalizeData(obj)); setSimTime(0);
+        
+        // Add Vietnamese translations to existing tokens
+        const enhancedObj = {
+          ...obj,
+          segments: obj.segments.map(segment => ({
+            ...segment,
+            tokens: segment.tokens?.map(token => ({
+              ...token,
+              vi: token.vi || jpViDict[token.surface] || ''
+            })) || []
+          }))
+        };
+        
+        setData(normalizeData(enhancedObj)); setSimTime(0);
       } catch (err) {
         alert("Lỗi đọc JSON: " + err.message);
       }
@@ -582,6 +720,102 @@ export default function JPVideoSubApp() {
     const ss = parseInt(m[3], 10) || 0;
     const ms = parseInt(m[4].padEnd(3, '0').slice(0,3), 10) || 0;
     return hh * 3600 + mm * 60 + ss + ms / 1000;
+  }
+
+  function parseSrtWithVocab(srtText) {
+    const blocks = srtText.trim().split(/\n\s*\n/);
+    const segments = [];
+    
+    for (const block of blocks) {
+      const lines = block.trim().split('\n');
+      if (lines.length < 3) continue;
+      
+      // Parse index
+      const idx = parseInt(lines[0], 10);
+      if (isNaN(idx)) continue;
+      
+      // Parse timestamp
+      const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[,.]\d{3})/);
+      if (!timeMatch) continue;
+      
+      const start = parseSrtTimecode(timeMatch[1]);
+      const end = parseSrtTimecode(timeMatch[2]);
+      
+      // Parse content
+      let hira = '';
+      let jp = '';
+      let vi = '';
+      let vocabDict = {};
+      
+      let i = 2;
+      while (i < lines.length) {
+        const line = lines[i].trim();
+        
+        // Check for vocabulary section
+        if (line === '<!-- VOCAB:') {
+          i++; // Move to next line
+          while (i < lines.length && lines[i].trim() !== '-->') {
+            const vocabLine = lines[i].trim();
+            if (vocabLine) {
+              // Parse format: "surface (reading): meaning"
+              const match = vocabLine.match(/^(.+?)\s*\(([^)]*)\):\s*(.+)$/);
+              if (match) {
+                const [, surface, reading, meaning] = match;
+                vocabDict[surface] = { reading: reading.trim(), vi: meaning.trim() };
+              }
+            }
+            i++;
+          }
+          i++; // Skip the '-->' line
+          continue;
+        }
+        
+        // Regular content lines
+        if (!hira) {
+          hira = line;
+        } else if (!jp) {
+          jp = line;
+        } else if (!vi) {
+          vi = line;
+        }
+        i++;
+      }
+      
+      // Create tokens from vocabulary
+      const tokens = [];
+      if (jp) {
+        // Simple tokenization - split by spaces and common punctuation
+        const words = jp.split(/(\s+|[。、！？])/).filter(w => w.trim());
+        let tokenIndex = 0;
+        
+        for (const word of words) {
+          if (word.trim()) {
+            const surface = word.trim();
+            const vocabInfo = vocabDict[surface] || {};
+            
+            tokens.push({
+              surface,
+              reading: vocabInfo.reading || surface,
+              romaji: '', // Will be filled by buildTokensFromJP if needed
+              pos: 'NOUN', // Default POS
+              t: tokenIndex * 0.5, // Simple timing
+              vi: vocabInfo.vi || ''
+            });
+            tokenIndex++;
+          }
+        }
+      }
+      
+      segments.push({
+        start,
+        end,
+        jp,
+        vi,
+        tokens
+      });
+    }
+    
+    return { segments };
   }
 
   function looksJapanese(s) {
@@ -626,15 +860,15 @@ export default function JPVideoSubApp() {
         if (looksJapanese(s)) jpLines.push(s); else viLines.push(s);
       }
       const jpJoined = jpLines.join(' ');
+      const baseTokens = buildTokensFromJP(jpJoined);
       const seg = {
         start: c.start,
         end: c.end,
         jp: jpJoined,
         vi: viLines.join(' '),
-        tokens: buildTokensFromJP(jpJoined),
+        tokens: buildChunks(baseTokens),
       };
-      // distribute times across tokens relative to segment duration
-      addTokenTimings(seg);
+      addChunkTimings(seg);
       return seg;
     });
     return { segments };
@@ -650,14 +884,16 @@ export default function JPVideoSubApp() {
       for (const m of ms) {
         const surface = m.surface_form || '';
         if (!surface.trim()) continue;
-        const pos = (m.pos || '').toUpperCase();
-        const isPunct = pos === '記号' || /\p{P}/u.test(surface);
+        const posJa = m.pos || '';
+        const pos1 = m.pos_detail_1 || '';
+        const isPunct = posJa === '記号' || /\p{P}/u.test(surface);
         if (isPunct) {
-          out.push({ surface, reading: '', pos: 'PUNCT' });
+          out.push({ surface, reading: '', pos: 'PUNCT', vi: '' });
         } else {
           const readingKana = m.reading ? wanakana.toHiragana(m.reading) : (isKanaOnly(surface) ? wanakana.toHiragana(surface) : '');
           const romaji = readingKana ? wanakana.toRomaji(readingKana) : '';
-          out.push({ surface, reading: readingKana, romaji, pos: mapKuromojiPos(pos) });
+          const vi = jpViDict[surface] || '';
+          out.push({ surface, reading: readingKana, romaji, pos: mapKuromojiPosDetailed(posJa, pos1), vi });
         }
       }
       return out;
@@ -670,7 +906,7 @@ export default function JPVideoSubApp() {
       const ch = s[i];
       if (punctSet.has(ch) || /\s/.test(ch)) {
         if (buf) { fallback.push(makeToken(buf)); buf = ''; }
-        if (!/\s/.test(ch)) { fallback.push({ surface: ch, reading: '', pos: 'PUNCT' }); }
+        if (!/\s/.test(ch)) { fallback.push({ surface: ch, reading: '', pos: 'PUNCT', vi: '' }); }
       } else {
         buf += ch;
       }
@@ -679,17 +915,21 @@ export default function JPVideoSubApp() {
     return fallback;
   }
 
-  function mapKuromojiPos(posJa) {
-    // Simple map from Japanese POS to our POS
-    if (posJa.includes('名詞')) return 'NOUN';
-    if (posJa.includes('固有')) return 'PROPN';
-    if (posJa.includes('動詞')) return 'VERB';
-    if (posJa.includes('形容詞')) return 'ADJ';
-    if (posJa.includes('副詞')) return 'ADV';
-    if (posJa.includes('助詞')) return 'PARTICLE';
-    if (posJa.includes('助動詞')) return 'AUX';
-    if (posJa.includes('記号')) return 'PUNCT';
-    return 'OTHER';
+  function mapKuromojiPosDetailed(posJa, pos1) {
+    try {
+      const p = String(posJa || '');
+      const d1 = String(pos1 || '');
+      if (p.includes('記号')) return 'PUNCT';
+      if (p.includes('助詞')) return 'PARTICLE';
+      if (p.includes('助動詞')) return 'AUX';
+      if (p.includes('動詞')) return 'VERB';
+      if (p.includes('形容詞')) return 'ADJ';
+      if (p.includes('名詞')) {
+        if (d1.includes('形容動詞語幹')) return 'ADJ';
+        return 'NOUN';
+      }
+      return 'OTHER';
+    } catch { return 'OTHER'; }
   }
 
   function isKanaOnly(str) {
@@ -698,17 +938,18 @@ export default function JPVideoSubApp() {
 
   function makeToken(surface) {
     const reading = isKanaOnly(surface) ? wanakana.toHiragana(surface) : '';
-    return { surface, reading, pos: 'OTHER' };
+    const vi = jpViDict[surface] || '';
+    return { surface, reading, pos: 'OTHER', vi };
   }
 
-  // Extract vocabulary list (unique NOUN/PROPN) from a segment
+  // Extract vocabulary list (unique NOUN/PROPN/VERB) from a segment
   function extractVocabList(seg) {
     const out = [];
     const seen = new Set();
     const tokens = seg?.tokens || [];
     for (const tk of tokens) {
       const pos = String(tk?.pos || '').toUpperCase();
-      if (pos === 'NOUN' || pos === 'PROPN') {
+      if (pos === 'NOUN' || pos === 'PROPN' || pos === 'VERB') {
         const word = String(tk?.surface || '').trim();
         if (word && !seen.has(word)) { seen.add(word); out.push(word); }
       }
@@ -716,19 +957,140 @@ export default function JPVideoSubApp() {
     return out;
   }
 
-  function addTokenTimings(segment) {
-    const tokens = segment.tokens || [];
-    const dur = Math.max(0, (segment.end || 0) - (segment.start || 0));
-    if (!tokens.length || dur === 0) return;
-    const weights = tokens.map(t => Math.max(1, (t.reading?.length || t.surface?.length || 1)));
-    const sum = weights.reduce((a,b)=>a+b,0);
-    let acc = 0;
+  // =====================
+  // Chunking + Timing helpers (align with server script)
+  // =====================
+
+  const POS_PRIORITY = ['VERB','ADJ','NOUN','ADV','PRON','ADNOM','CONJ','INTJ','PREFIX','SUFFIX','PARTICLE','OTHER'];
+
+  function chunkPos(posList) {
+    if (posList.includes('VERB')) return 'VERB';
+    if (posList.includes('ADJ')) return 'ADJ';
+    for (const p of POS_PRIORITY) { if (posList.includes(p)) return p; }
+    return 'OTHER';
+  }
+
+  const MERGE_PATTERNS = [
+    { pat: ['と','いう'], surface: 'という', pos: 'EXPR' },
+    { pat: ['の','に'], surface: 'のに', pos: 'CONJ' },
+    { pat: ['と','して'], surface: 'として', pos: 'PARTICLE' },
+    // custom expressions requested
+    { pat: ['と','いった'], surface: 'といった', pos: 'EXPR' },
+    { pat: ['この','よう','に'], surface: 'このように', pos: 'ADV' },
+    { pat: ['気','を','付ける'], surface: '気を付ける', pos: 'VERB' },
+  ];
+
+  function mergeFixedExpressions(tokens) {
+    const out = []; let skip = 0;
     for (let i = 0; i < tokens.length; i++) {
-      const startRel = (acc / sum) * dur;
-      acc += weights[i];
-      const endRel = (acc / sum) * dur;
-      tokens[i].t = startRel;
-      tokens[i].end = endRel;
+      if (skip) { skip--; continue; }
+      let matched = false;
+      for (const mp of MERGE_PATTERNS) {
+        const { pat, surface, pos } = mp;
+        if (i + pat.length <= tokens.length) {
+          const surfaces = tokens.slice(i, i + pat.length).map(t => String(t.surface || ''));
+          if (surfaces.join('\u0001') === pat.join('\u0001')) {
+            const readings = tokens.slice(i, i + pat.length).map(t => t.reading || '').join('');
+            const romaji = tokens.slice(i, i + pat.length).map(t => t.romaji || '').filter(Boolean).join(' ');
+            out.push({ surface, reading: readings, romaji, pos });
+            skip = pat.length - 1; matched = true; break;
+          }
+        }
+      }
+      if (!matched) out.push(tokens[i]);
+    }
+    return out;
+  }
+
+  function buildChunks(baseTokens) {
+    const base = mergeFixedExpressions(baseTokens);
+    const chunks = [];
+    let curSurfaces = [], curReadings = [], curRomajis = [], curPoses = [];
+    const flush = () => {
+      if (!curSurfaces.length) return;
+      const surface = curSurfaces.join('');
+      const reading = curReadings.join('');
+      const romaji = curRomajis.filter(Boolean).join(' ');
+      const pos = chunkPos(curPoses);
+      chunks.push({ surface, reading, romaji, pos });
+      curSurfaces = []; curReadings = []; curRomajis = []; curPoses = [];
+    };
+    for (let i = 0; i < base.length; i++) {
+      const tok = base[i] || {};
+      const pos = String(tok.pos || '').toUpperCase();
+      if (pos === 'PUNCT' || pos === 'PARTICLE') { flush(); chunks.push(tok); continue; }
+      curSurfaces.push(String(tok.surface || ''));
+      curReadings.push(String(tok.reading || ''));
+      if (tok.romaji) curRomajis.push(String(tok.romaji));
+      curPoses.push(pos);
+    }
+    flush();
+    return chunks;
+  }
+
+  function countMora(hira) {
+    const s = String(hira || '');
+    if (!s) return 1;
+    const smalls = new Set(Array.from('ゃゅょぁぃぅぇぉゎァィゥェォャュョヮ'));
+    let mora = 0;
+    for (const ch of Array.from(s)) {
+      if (smalls.has(ch)) continue;
+      if (ch === 'っ' || ch === 'ッ') mora += 1; else mora += 1;
+    }
+    return Math.max(1, mora);
+  }
+
+  function distributeTimesWeighted(tokens, segDur) {
+    const ANTICIPATE_FRACTION = 0.6;
+    const GLOBAL_ADVANCE_SEC = 0.12;
+    const pad = segDur > 0.7 ? 0.05 : 0.0;
+    const usable = Math.max(0, segDur - 2 * pad);
+    const PAUSE_AFTER_TEN = 1.5;
+    const PARTICLE_WEIGHT = 0.6;
+    const weights = []; const pauses = [];
+    for (const tok of tokens) {
+      const pos = String(tok.pos || '').toUpperCase();
+      const surface = String(tok.surface || '');
+      if (pos === 'PUNCT' && surface === '、') { weights.push(0); pauses.push(PAUSE_AFTER_TEN); }
+      else if (pos === 'PARTICLE') { weights.push(PARTICLE_WEIGHT); pauses.push(0); }
+      else { weights.push(countMora(tok.reading || tok.surface)); pauses.push(0); }
+    }
+    const totalUnits = Math.max(0, weights.reduce((a,b)=>a+b,0) + pauses.reduce((a,b)=>a+b,0));
+    if (totalUnits <= 0) {
+      for (let i = 0; i < tokens.length; i++) {
+        tokens[i].t = Math.round((pad + usable * ((i + 1) / (tokens.length + 1))) * 100) / 100;
+      }
+      return;
+    }
+    let acc = 0; const raw = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const w = weights[i] || 0; const half = w > 0 ? (w / 2) : 0;
+      const center = acc + half;
+      const lead = half * ANTICIPATE_FRACTION;
+      const anchor = Math.max(0, center - lead);
+      const t = pad + usable * (anchor / totalUnits) - GLOBAL_ADVANCE_SEC;
+      raw.push(t);
+      acc += (w + (pauses[i] || 0));
+    }
+    let last = pad;
+    for (let i = 0; i < raw.length; i++) {
+      let t = Math.max(pad, Math.min(pad + usable, raw[i]));
+      if (t < last) t = last;
+      last = t;
+      tokens[i].t = Math.round(t * 100) / 100;
+    }
+  }
+
+  function addChunkTimings(segment) {
+    const dur = Math.max(0, (segment.end || 0) - (segment.start || 0));
+    const tokens = segment.tokens || [];
+    if (!tokens.length || dur === 0) return;
+    distributeTimesWeighted(tokens, dur);
+    for (let i = 0; i < tokens.length; i++) {
+      const start = Math.min(Math.max(0, tokens[i].t ?? 0), dur);
+      const nextT = tokens[i + 1]?.t;
+      const end = typeof tokens[i].end === 'number' ? tokens[i].end : (typeof nextT === 'number' ? nextT : dur);
+      tokens[i].t = start; tokens[i].end = Math.min(Math.max(start, end), dur);
     }
   }
 
@@ -738,7 +1100,15 @@ export default function JPVideoSubApp() {
     reader.onload = () => {
       try {
         const txt = String(reader.result || '');
-        const obj = srtToSegments(txt);
+        
+        // Try to parse as SRT with vocabulary first
+        let obj;
+        if (txt.includes('<!-- VOCAB:')) {
+          obj = parseSrtWithVocab(txt);
+        } else {
+          obj = srtToSegments(txt);
+        }
+        
         // If we already have JSON with tokens, merge SRT timings into existing segments
         if (data?.segments?.length) {
           const merged = (data.segments || []).map((seg, i) => {
@@ -752,7 +1122,7 @@ export default function JPVideoSubApp() {
               return c;
             });
             newSeg.tokens = tokens;
-            addTokenTimings(newSeg);
+            addChunkTimings(newSeg);
             return newSeg;
           });
           setData(normalizeData({ segments: merged })); setSimTime(0); setLastLoadedFromSrt(true);
@@ -783,8 +1153,36 @@ export default function JPVideoSubApp() {
 
   function setPlaybackRate(r) {
     setRate(r);
+    setAudioPlaybackRate(r);
     if (videoRef.current) videoRef.current.playbackRate = r;
     if (audioMainRef.current) { try { audioMainRef.current.playbackRate = r; } catch {} }
+  }
+
+  // Audio control functions
+  function setAudioVolumeControl(vol) {
+    setAudioVolume(vol);
+    if (videoRef.current) videoRef.current.volume = vol;
+    if (audioMainRef.current) { try { audioMainRef.current.volume = vol; } catch {} }
+  }
+
+  function setAudioPlaybackRateControl(rate) {
+    setAudioPlaybackRate(rate);
+    if (videoRef.current) videoRef.current.playbackRate = rate;
+    if (audioMainRef.current) { try { audioMainRef.current.playbackRate = rate; } catch {} }
+  }
+
+  function toggleAudioMute() {
+    const newMuted = !audioMuted;
+    setAudioMuted(newMuted);
+    if (videoRef.current) videoRef.current.muted = newMuted;
+    if (audioMainRef.current) { try { audioMainRef.current.muted = newMuted; } catch {} }
+  }
+
+  function toggleAudioLoop() {
+    const newLoop = !audioLoop;
+    setAudioLoop(newLoop);
+    if (videoRef.current) videoRef.current.loop = newLoop;
+    if (audioMainRef.current) { try { audioMainRef.current.loop = newLoop; } catch {} }
   }
 
   function formatSrtTimestamp(s) {
@@ -808,6 +1206,38 @@ export default function JPVideoSubApp() {
       if (hira) lines.push(hira);
       if (jp) lines.push(jp);
       if (vi) lines.push(vi);
+      
+      // Add vocabulary section with Vietnamese meanings based on highlight mode
+      if (seg.tokens && seg.tokens.length > 0) {
+        const vocabEntries = [];
+        const seen = new Set();
+        
+        for (const tk of seg.tokens) {
+          const pos = String(tk?.pos || '').toUpperCase();
+          // Use highlight mode settings to determine which POS to include
+          const shouldInclude = highlightMode === 'A' 
+            ? (pos === 'NOUN' || pos === 'PROPN')
+            : (pos === 'NOUN' || pos === 'PROPN' || pos === 'VERB');
+          
+          if (!shouldInclude) continue;
+          const surface = String(tk?.surface || '').trim();
+          if (!surface || seen.has(surface)) continue;
+          seen.add(surface);
+          
+          const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
+          if (vi) {
+            vocabEntries.push(`${surface} (${tk.reading || ''}): ${vi}`);
+          }
+        }
+        
+        if (vocabEntries.length > 0) {
+          lines.push(''); // Empty line before vocab
+          lines.push(`<!-- VOCAB (${highlightMode === 'A' ? 'NOUN/PROPN' : 'NOUN/PROPN/VERB'}):`);
+          vocabEntries.forEach(entry => lines.push(`  ${entry}`));
+          lines.push('-->');
+        }
+      }
+      
       lines.push('');
     }
     return lines.join('\n');
@@ -819,13 +1249,87 @@ export default function JPVideoSubApp() {
       const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'subtitles.srt';
+      a.href = url; 
+      a.download = `subtitles_mode_${highlightMode.toLowerCase()}.srt`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
     } catch (e) {
       alert('Xuất SRT thất bại: ' + (e?.message || e));
     }
+  }
+
+  function downloadSrtWithVocab() {
+    try {
+      const srt = buildSrt(data);
+      const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; 
+      a.download = `subtitles_with_vocab_mode_${highlightMode.toLowerCase()}.srt`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+    } catch (e) {
+      alert('Xuất SRT + Vocab thất bại: ' + (e?.message || e));
+    }
+  }
+
+  function downloadJson() {
+    try {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; 
+      a.download = `subtitles_mode_${highlightMode.toLowerCase()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+    } catch (e) {
+      alert('Xuất JSON thất bại: ' + (e?.message || e));
+    }
+  }
+
+  // Vocabulary editing functions
+  function startEditVocab(entry, tokenIndex, segmentIndex) {
+    setEditingVocab({
+      surface: entry.surface,
+      vi: entry.vi,
+      tokenIndex,
+      segmentIndex
+    });
+  }
+
+  function saveVocabEdit() {
+    if (!editingVocab) return;
+    
+    const { surface, vi, tokenIndex, segmentIndex } = editingVocab;
+    
+    // Update custom dictionary
+    setCustomVocabDict(prev => ({
+      ...prev,
+      [surface]: vi
+    }));
+    
+    // Update data
+    setData(prevData => {
+      const newData = { ...prevData };
+      if (newData.segments[segmentIndex]?.tokens[tokenIndex]) {
+        newData.segments[segmentIndex].tokens[tokenIndex].vi = vi;
+      }
+      return newData;
+    });
+    
+    setEditingVocab(null);
+  }
+
+  function cancelVocabEdit() {
+    setEditingVocab(null);
+  }
+
+  function getVocabTranslation(surface) {
+    return customVocabDict[surface] || jpViDict[surface] || '';
   }
 
   function findSegmentAtTime(segmentsArr, time) {
@@ -854,6 +1358,13 @@ export default function JPVideoSubApp() {
     canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d');
     const canvasStream = canvas.captureStream(30);
+    
+    console.log('Canvas created:', {
+      width: canvas.width,
+      height: canvas.height,
+      hasContext: !!ctx,
+      streamFPS: 30
+    });
     let stream = canvasStream;
     try {
       // Prefer uploaded audio if present
@@ -873,7 +1384,14 @@ export default function JPVideoSubApp() {
           stream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
         }
       }
-    } catch {}
+    } catch (e) { console.warn('Audio mixing failed, using video only:', e); }
+    
+    console.log('Final stream:', {
+      active: stream.active,
+      videoTracks: stream.getVideoTracks().length,
+      audioTracks: stream.getAudioTracks().length,
+      trackStates: stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, readyState: t.readyState }))
+    });
     let chunks = [];
     const mimeCandidates = [
       'video/webm;codecs=vp9,opus',
@@ -885,14 +1403,34 @@ export default function JPVideoSubApp() {
     let mime = '';
     for (const m of mimeCandidates) { if (MediaRecorder.isTypeSupported(m)) { mime = m; break; } }
     const rec = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 128_000 });
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    
+    console.log('MediaRecorder setup:', {
+      mimeType: mime,
+      videoBitsPerSecond: 4_000_000,
+      audioBitsPerSecond: 128_000,
+      streamActive: stream.active,
+      streamTracks: stream.getTracks().length
+    });
+    
+    rec.ondataavailable = (e) => { 
+      console.log('Data available:', e.data?.size, 'bytes');
+      if (e.data && e.data.size) chunks.push(e.data); 
+    };
+    
     rec.onstop = () => {
+      console.log('MediaRecorder stopped, chunks:', chunks.length, 'total size:', chunks.reduce((s, c) => s + c.size, 0));
       const blob = new Blob(chunks, { type: 'video/webm' });
+      console.log('Blob created:', blob.size, 'bytes');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'video_with_sub.webm';
+      a.href = url; a.download = `video_with_sub_mode_${highlightMode.toLowerCase()}.webm`;
       document.body.appendChild(a); a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+      setRecording(false);
+    };
+    
+    rec.onerror = (e) => {
+      console.error('MediaRecorder error:', e);
       setRecording(false);
     };
 
@@ -911,9 +1449,23 @@ export default function JPVideoSubApp() {
       NOUN: '59,130,246', PROPN: '99,102,241', PRON: '14,165,233', PARTICLE: '16,185,129', VERB: '244,63,94', ADJ: '249,115,22', ADV: '245,158,11', EXPR: '139,92,246', NUM: '6,182,212', AUX: '236,72,153', COUNTER: '20,184,166', SYMBOL: '120,113,108', OTHER: '107,114,128'
     };
     function posBg(pos, active) {
-      const rgb = POS_RGB[(pos || 'OTHER').toUpperCase()] || POS_RGB.OTHER;
-      const a = active ? 1 : 0.4;
-      return `rgba(${rgb},${a})`;
+      // Use mode B enhanced colors if enabled
+      if (highlightMode === 'B' && highlightModeBColorScheme === 'enhanced') {
+        const enhancedColors = {
+          'NOUN': '59,130,246', 'PROPN': '99,102,241', 'VERB': '244,63,94',
+          'ADJ': '249,115,22', 'ADV': '245,158,11', 'PRON': '14,165,233',
+          'PARTICLE': '16,185,129', 'AUX': '236,72,153', 'NUM': '6,182,212',
+          'COUNTER': '20,184,166', 'SYMBOL': '120,113,108', 'OTHER': '107,114,128'
+        };
+        const rgb = enhancedColors[(pos || 'OTHER').toUpperCase()] || enhancedColors.OTHER;
+        const intensity = highlightModeBIntensity || 1.0;
+        const a = active ? intensity : 0.4;
+        return `rgba(${rgb},${a})`;
+      } else {
+        const rgb = POS_RGB[(pos || 'OTHER').toUpperCase()] || POS_RGB.OTHER;
+        const a = active ? 1 : 0.4;
+        return `rgba(${rgb},${a})`;
+      }
     }
     function roundRect(context, x, y, w, h, r) {
       const rr = Math.min(r, w / 2, h / 2);
@@ -981,8 +1533,10 @@ export default function JPVideoSubApp() {
 
     function drawOverlayFrame(nowTime) {
       ctx.clearRect(0, 0, width, height);
+      console.log('Drawing frame at time:', nowTime, 'hasVideo:', hasVideo);
       if (hasVideo) {
         ctx.drawImage(vid, 0, 0, width, height);
+        console.log('Drew video frame');
       } else if (bgImageRef.current) {
         const img = bgImageRef.current;
         // cover
@@ -996,10 +1550,52 @@ export default function JPVideoSubApp() {
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, dx, dy, dw, dh);
       }
-      const tNow = nowTime + highlightOffset;
+      // Use highlight timing based on current mode
+      const currentHighlightTiming = highlightMode === 'A' ? {
+        enabled: highlightModeAEnabled,
+        offset: highlightOffset,
+        tokenLead: tokenLead,
+        punctSkip: punctSkip
+      } : {
+        enabled: highlightModeBEnabled,
+        offset: highlightModeBOffset,
+        tokenLead: highlightModeBTokenLead,
+        punctSkip: highlightModeBPunctSkip
+      };
+      
+      const tNow = nowTime + currentHighlightTiming.offset;
+      console.log('Video recording debug:', {
+        nowTime,
+        tNow,
+        offset: currentHighlightTiming.offset,
+        segmentsCount: data.segments?.length,
+        segments: data.segments?.map(s => ({ start: s.start, end: s.end, jp: s.jp }))
+      });
       const segIdx = findSegmentAtTime(data.segments, tNow);
-      const seg = segIdx >= 0 ? data.segments[segIdx] : null;
-      if (!seg) return;
+      let seg = segIdx >= 0 ? data.segments[segIdx] : null;
+      let actualSegIdx = segIdx;
+      
+      if (!seg) {
+        console.log('No segment found at time:', nowTime, 'tNow:', tNow, 'segIdx:', segIdx);
+        // Don't return early - continue to draw the last segment if available
+        if (data.segments && data.segments.length > 0) {
+          const lastSeg = data.segments[data.segments.length - 1];
+          console.log('Using last segment:', lastSeg.jp, 'end time:', lastSeg.end);
+          // Continue with last segment for a few more seconds
+          if (tNow <= lastSeg.end + 2) {
+            // Use last segment
+            actualSegIdx = data.segments.length - 1;
+            seg = lastSeg;
+            console.log('Drawing last segment:', actualSegIdx, 'jp:', seg.jp, 'vi:', seg.vi, 'tokens:', seg.tokens?.length);
+          } else {
+            return;
+          }
+        } else {
+          return;
+        }
+      } else {
+        console.log('Drawing segment:', actualSegIdx, 'jp:', seg.jp, 'vi:', seg.vi, 'tokens:', seg.tokens?.length);
+      }
 
       // Layout area
       ctx.textBaseline = 'top';
@@ -1036,9 +1632,9 @@ export default function JPVideoSubApp() {
       // Build JP/VI per-sentence layout (wrap JP tokens to multiple rows, keep font size)
       const segTokens = seg.tokens || [];
       // Active token index within segment for ring
-      const segOffset = segOffsets[segIdx] || 0;
-      const rel = (tNow + tokenLead + segOffset) - seg.start;
-      const activeIdx = getActiveTokenIndex(seg, rel, punctSkip);
+      const segOffset = segOffsets[actualSegIdx] || 0;
+      const rel = (tNow + currentHighlightTiming.tokenLead + segOffset) - seg.start;
+      const activeIdx = getActiveTokenIndex(seg, rel, currentHighlightTiming.punctSkip);
 
       // Precompute sentences
       const sents = splitTokensBySentences(segTokens);
@@ -1114,17 +1710,141 @@ export default function JPVideoSubApp() {
       const sentenceGap = Math.round(10 * scale);
       const jpBlockH = jpViLayouts.reduce((s, it) => s + it.jpBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * sentenceGap);
       const viBlockH = jpViLayouts.reduce((s, it) => s + it.viBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * Math.round(2 * scale));
+      
       const boxH = padY + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
       const bottomMargin = Math.round(36 * scale);
       const offsetY = Math.round(subOffsetY * scale);
       // Keep subtitle panel strictly within frame
       let boxY = subCentered ? (Math.round(height / 2 - boxH / 2 + offsetY)) : (height - boxH - bottomMargin + offsetY);
       if (boxY < 0) boxY = 0; if (boxY + boxH > height) boxY = Math.max(0, height - boxH);
+      
+      // Reserve space for vocabulary panel if in Mode B
+      if (highlightMode === 'B' && seg.tokens && seg.tokens.length > 0) {
+        const vocabEntries = [];
+        const seen = new Set();
+        
+        for (const tk of seg.tokens) {
+          const pos = String(tk?.pos || '').toUpperCase();
+          if (pos !== 'NOUN' && pos !== 'PROPN' && pos !== 'VERB') continue;
+          const surface = String(tk?.surface || '').trim();
+          if (!surface || seen.has(surface)) continue;
+          seen.add(surface);
+          
+          const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
+          if (vi) {
+            vocabEntries.push({
+              surface,
+              reading: String(tk?.reading || '').trim(),
+              vi,
+              pos
+            });
+          }
+        }
+        
+        if (vocabEntries.length > 0) {
+          // Calculate required space for vocabulary
+          const itemWidth = Math.round(120 * scale);
+          const itemHeight = Math.round(80 * scale);
+          const itemsPerRow = Math.floor((innerW + outerMargin * 2 - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+          const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+          const vocabPanelHeight = Math.max(
+            Math.round(60 * scale) + (rows * (itemHeight + Math.round(12 * scale))),
+            Math.round(100 * scale)
+          );
+          
+          // Adjust subtitle position to leave room for vocabulary
+          const requiredSpace = vocabPanelHeight + Math.round(40 * scale); // Gap + margin
+          const maxBoxY = height - boxH - requiredSpace;
+          
+          if (boxY > maxBoxY) {
+            boxY = Math.max(Math.round(20 * scale), maxBoxY);
+          }
+        }
+      }
+
+      // Calculate vocabulary panel dimensions for Mode B (but draw later)
+      let vocabPanelWidth = 0;
+      let vocabPanelX = 0;
+      let vocabPanelY = 0;
+      let vocabPanelHeight = 0;
+      let vocabEntries = [];
+      if (highlightMode === 'B' && seg.tokens && seg.tokens.length > 0) {
+        const seen = new Set();
+        
+        for (const tk of seg.tokens) {
+          const pos = String(tk?.pos || '').toUpperCase();
+          if (pos !== 'NOUN' && pos !== 'PROPN' && pos !== 'VERB') continue;
+          const surface = String(tk?.surface || '').trim();
+          if (!surface || seen.has(surface)) continue;
+          seen.add(surface);
+          
+          const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
+          if (vi) {
+            vocabEntries.push({
+              surface,
+              reading: String(tk?.reading || '').trim(),
+              vi,
+              pos
+            });
+          }
+        }
+        
+        if (vocabEntries.length > 0) {
+          // Calculate vocabulary panel dimensions - full width like subtitle
+          vocabPanelWidth = innerW + outerMargin * 2; // Same width as subtitle panel
+          
+          // Calculate vocabulary panel height for horizontal grid - full width
+          const itemWidth = Math.round(120 * scale);
+          const itemHeight = Math.round(80 * scale);
+          const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+          const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+          vocabPanelHeight = Math.max(
+            Math.round(60 * scale) + (rows * (itemHeight + Math.round(12 * scale))),
+            Math.round(100 * scale)
+          );
+          
+          // Position vocabulary panel below subtitle, full width
+          const gap = Math.round(20 * scale);
+          vocabPanelX = x0; // Full width like subtitle
+          vocabPanelY = boxY + boxH + gap; // Below subtitle
+          
+          
+          // Always move subtitle up to make room for vocabulary
+          const requiredSpace = vocabPanelHeight + gap + Math.round(50 * scale); // Extra margin
+          const availableSpace = height - boxY - boxH;
+          
+          if (requiredSpace > availableSpace) {
+            const moveUp = requiredSpace - availableSpace;
+            boxY = Math.max(Math.round(20 * scale), boxY - moveUp);
+            vocabPanelY = boxY + boxH + gap;
+          }
+          
+          // Ensure vocabulary panel is within screen bounds
+          const maxVocabY = height - Math.round(100 * scale);
+          if (vocabPanelY > maxVocabY) {
+            vocabPanelY = Math.max(Math.round(20 * scale), maxVocabY - Math.round(200 * scale));
+          }
+          
+          // Adjust subtitle width to make room for vocabulary
+          if (vocabPanelX + vocabPanelWidth <= width - Math.round(20 * scale)) {
+            // Vocabulary beside subtitle - reduce subtitle width
+            const newSubtitleWidth = vocabPanelX - gap - x0;
+            if (newSubtitleWidth > Math.round(200 * scale)) {
+              innerW = newSubtitleWidth - outerMargin * 2;
+            }
+          }
+        }
+      }
 
       // Panel background
       ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
       roundRect(ctx, x0, boxY, innerW + outerMargin * 2, boxH, Math.max(8, Math.round(16 * scale)));
       ctx.fill();
+      
+      // Debug: Draw a simple test text
+      ctx.fillStyle = '#ff0000';
+      ctx.font = '20px Arial';
+      ctx.fillText('TEST SUBTITLE', 50, 50);
 
 
       // Draw sentences: JP tokens line (centered) then VI lines (centered)
@@ -1142,7 +1862,7 @@ export default function JPVideoSubApp() {
             x += row.tagW;
           }
           for (const b of row.boxes) {
-            const isActive = highlightEnabled && b.gi === activeIdx && !isPunctToken(b.tk);
+            const isActive = currentHighlightTiming.enabled && b.gi === activeIdx && !isPunctToken(b.tk);
             const bg = posBg(b.tk.pos, isActive);
             if (row.anyReading && showFurigana && b.tk.reading && !isPunctToken(b.tk)) {
               ctx.font = `500 ${readingFontPxBase}px ${fontFamily}`;
@@ -1169,6 +1889,107 @@ export default function JPVideoSubApp() {
         jy += sentenceGap;
       }
 
+      // Draw vocabulary panel for Mode B (AFTER subtitle panel)
+      console.log('Video recording vocab debug:', {
+        highlightMode,
+        vocabEntriesLength: vocabEntries.length,
+        vocabEntries: vocabEntries.map(e => ({ surface: e.surface, vi: e.vi })),
+        vocabPanelX,
+        vocabPanelY,
+        vocabPanelWidth,
+        segTokens: seg.tokens?.length,
+        segTokensSample: seg.tokens?.slice(0, 3).map(t => ({ surface: t.surface, pos: t.pos, vi: t.vi })),
+        screenWidth: width,
+        screenHeight: height,
+        boxY,
+        boxH,
+        subtitleRight: x0 + innerW + outerMargin * 2,
+        vocabPanelHeight: vocabPanelHeight || 0,
+        availableSpace: height - vocabPanelY,
+        willFit: (vocabPanelY + (vocabPanelHeight || 0)) <= height
+      });
+      
+      if (highlightMode === 'B' && vocabEntries.length > 0) {
+        console.log('Drawing vocabulary panel with', vocabEntries.length, 'entries');
+        
+        // Calculate vocabulary items layout
+        const itemWidth = Math.round(120 * scale);
+        const itemHeight = Math.round(80 * scale);
+        const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+        const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+        
+        // Test rectangle to ensure drawing works
+        ctx.fillStyle = 'rgba(255,0,0,0.5)';
+        ctx.fillRect(vocabPanelX, vocabPanelY, vocabPanelWidth, 50);
+        console.log('Drew test red rectangle at:', vocabPanelX, vocabPanelY, vocabPanelWidth, 50);
+        
+        // Panel background
+        ctx.fillStyle = `rgba(0,0,0,${bgAlpha * 0.9})`;
+        roundRect(ctx, vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight, Math.max(12, Math.round(16 * scale)));
+        ctx.fill();
+        console.log('Drew vocab panel background at:', vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight);
+        
+        // Panel border
+        ctx.strokeStyle = 'rgba(59,130,246,0.7)';
+        ctx.lineWidth = Math.max(2, Math.round(2 * scale));
+        roundRect(ctx, vocabPanelX, vocabPanelY, vocabPanelWidth, vocabPanelHeight, Math.max(12, Math.round(16 * scale)));
+        ctx.stroke();
+        console.log('Drew vocab panel border');
+        
+        // Title
+        ctx.textAlign = 'center';
+        ctx.font = `700 ${Math.max(14 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
+        ctx.fillStyle = '#fbbf24';
+        const titleY = vocabPanelY + Math.round(18 * scale);
+        ctx.fillText(`📚 Từ vựng (${vocabEntries.length})`, vocabPanelX + vocabPanelWidth / 2, titleY);
+        console.log('Drew vocab title at:', vocabPanelX + vocabPanelWidth / 2, titleY);
+        
+        // Vocabulary items - horizontal grid, full width, large text
+        const itemPadding = Math.round(16 * scale);
+        
+        const startX = vocabPanelX + itemPadding;
+        const startY = titleY + Math.round(20 * scale);
+        
+        vocabEntries.forEach((entry, idx) => {
+          const row = Math.floor(idx / itemsPerRow);
+          const col = idx % itemsPerRow;
+          const x = startX + col * (itemWidth + Math.round(12 * scale));
+          const y = startY + row * (itemHeight + Math.round(12 * scale));
+          
+          console.log(`Drawing vocab item ${idx}:`, entry.surface, 'at', x, y);
+          
+          // Item background
+          ctx.fillStyle = 'rgba(59,130,246,0.15)';
+          roundRect(ctx, x, y, itemWidth, itemHeight, Math.max(8, Math.round(12 * scale)));
+          ctx.fill();
+          
+          // Item border
+          ctx.strokeStyle = 'rgba(59,130,246,0.5)';
+          ctx.lineWidth = Math.max(2, Math.round(2 * scale));
+          roundRect(ctx, x, y, itemWidth, itemHeight, Math.max(8, Math.round(12 * scale)));
+          ctx.stroke();
+          
+          // Japanese text - larger and bolder
+          ctx.textAlign = 'center';
+          ctx.font = `700 ${Math.max(16 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(entry.surface, x + itemWidth / 2, y + Math.round(20 * scale));
+          
+          // Reading - larger
+          if (entry.reading) {
+            ctx.font = `500 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
+            ctx.fillStyle = '#e4e4e7';
+            ctx.fillText(entry.reading, x + itemWidth / 2, y + Math.round(40 * scale));
+          }
+          
+          // Vietnamese meaning - larger and bolder
+          ctx.font = `600 ${Math.max(14 * scale, subFontSize * scale * 0.8)}px ${fontFamily}`;
+          ctx.fillStyle = '#10b981';
+          ctx.fillText(entry.vi, x + itemWidth / 2, y + Math.round(60 * scale));
+        });
+        console.log('Finished drawing all vocab items');
+      }
+
       // Optional: draw current time debug marker for multi-sentence verification
       // ctx.fillStyle = '#0f0'; ctx.fillRect(4, 4, 2, 8);
     }
@@ -1176,7 +1997,15 @@ export default function JPVideoSubApp() {
     // Playback and record
     setRecording(true);
     chunks = [];
-    rec.start(500);
+    console.log('Starting MediaRecorder...');
+    try {
+      rec.start(500);
+      console.log('MediaRecorder started successfully');
+    } catch (error) {
+      console.error('Failed to start MediaRecorder:', error);
+      setRecording(false);
+      return;
+    }
     const useRVFC = hasVideo && typeof vid.requestVideoFrameCallback === 'function';
     let rafId = 0;
     function onFrame(_n, metadata) {
@@ -1192,7 +2021,8 @@ export default function JPVideoSubApp() {
     const onVideoEnded = () => {
       if (!audioMainRef.current) {
         if (rafId) cancelAnimationFrame(rafId);
-        try { rec.stop(); } catch {}
+        console.log('Video ended, stopping MediaRecorder...');
+        try { rec.stop(); } catch (e) { console.error('Error stopping MediaRecorder:', e); }
       }
       vid.removeEventListener('ended', onVideoEnded);
     };
@@ -1202,7 +2032,11 @@ export default function JPVideoSubApp() {
       // If there is audio, drive by audio; otherwise let video play once
       if (audioMainRef.current) {
         const a = audioMainRef.current;
-        const stopWhenAudioEnds = () => { try { rec.stop(); } catch {}; setPlaying(false); };
+        const stopWhenAudioEnds = () => { 
+          console.log('Audio ended, stopping MediaRecorder...');
+          try { rec.stop(); } catch (e) { console.error('Error stopping MediaRecorder:', e); } 
+          setPlaying(false); 
+        };
         a.addEventListener('ended', stopWhenAudioEnds, { once: true });
         try { a.currentTime = 0; a.play(); } catch {}
       } else {
@@ -1211,8 +2045,9 @@ export default function JPVideoSubApp() {
     } else if (audioMainRef.current) {
       const a = audioMainRef.current;
       const stopWhenAudioEnds = () => {
+        console.log('Audio ended (no video), stopping MediaRecorder...');
         try { a.pause(); } catch {}
-        try { rec.stop(); } catch {}
+        try { rec.stop(); } catch (e) { console.error('Error stopping MediaRecorder:', e); }
         setPlaying(false);
       };
       a.addEventListener('ended', stopWhenAudioEnds, { once: true });
@@ -1291,10 +2126,6 @@ export default function JPVideoSubApp() {
                 <TrendingUp className="icon-4" />
                 <span>Trends</span>
               </button>
-              <button className="btn" onClick={() => setAiVideoOpen(true)}>
-                <Video className="icon-4" />
-                <span>AI Video</span>
-              </button>
             </div>
             
             {/* Other */}
@@ -1308,11 +2139,6 @@ export default function JPVideoSubApp() {
                   setImageURL(url);
                 }} />
               </label>
-              <Link to="/image-video" style={{ textDecoration: 'none' }}>
-                <button className="btn">
-                  <span>AI Video</span>
-                </button>
-              </Link>
             </div>
           </div>
         </div>
@@ -1464,12 +2290,128 @@ export default function JPVideoSubApp() {
               <audio ref={audioMainRef} src={audioMainURL} preload="auto" onLoadedMetadata={() => { try { setMediaDuration(audioMainRef.current?.duration || 0); } catch {} }} style={{ display: 'none' }} />
             )}
 
-            {/* Sub overlay (mobile only) */}
+            {/* Sub overlay */}
             <div className={`subtitle-overlay ${subCentered ? 'center' : ''}`}>
               <div className="overlay-inner">
                 {currentSeg && (
-                  <div className="overlay-panel" style={{ backgroundColor: `rgba(0,0,0,${opacity})`, ['--sub-font-size']: `${subFontSize}px`, ['--sub-offset-y']: `${subOffsetY}px` }}>
-                    <div className="subs-current" data-hl={highlightEnabled ? 'on' : 'off'}>
+                  <>
+                    {tokenByTokenMode ? (
+                      /* Token-by-token mode */
+                      <div className={`overlay-panel ${highlightMode === 'B' && highlightModeBColorScheme === 'enhanced' ? 'highlight-mode-b-enhanced' : ''}`} style={{ backgroundColor: `rgba(0,0,0,${opacity})`, ['--sub-font-size']: `${subFontSize}px`, ['--sub-offset-y']: `${subOffsetY}px` }}>
+                        {/* Câu hoàn chỉnh */}
+                        <div style={{ 
+                          fontSize: '1.1rem', 
+                          fontWeight: '600', 
+                          color: '#ffffff', 
+                          marginBottom: '1rem',
+                          textAlign: 'center',
+                          lineHeight: '1.4'
+                        }}>
+                          {currentSeg.jp}
+                        </div>
+                        
+                        {/* Token-by-token display */}
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          gap: '0.5rem', 
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }}>
+                          {currentSeg.tokens?.map((tk, i) => {
+                            const isHighlightable = !isPunctToken(tk);
+                            const isActive = i === currentTokenIndex;
+                            const active = highlightTiming.enabled && isActive && isHighlightable;
+                            const vi = String(tk?.vi || getVocabTranslation(tk.surface) || '').trim();
+                            
+                            return (
+                              <div
+                                key={i}
+                                style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  padding: '0.5rem',
+                                  backgroundColor: active ? 'rgba(59,130,246,0.2)' : 'rgba(39,39,42,0.6)',
+                                  borderRadius: '0.5rem',
+                                  border: active ? '2px solid #3b82f6' : '1px solid rgba(63,63,70,0.5)',
+                                  transition: 'all 0.2s ease',
+                                  minWidth: '80px',
+                                  textAlign: 'center'
+                                }}
+                                data-pos={tk.pos}
+                                data-active={active ? 'true' : 'false'}
+                              >
+                                {/* Japanese token */}
+                                <div style={{ 
+                                  fontSize: '1rem', 
+                                  fontWeight: '600', 
+                                  color: '#ffffff',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {tk.surface}
+                                </div>
+                                
+                                {/* Reading */}
+                                {showFurigana && tk.reading && (
+                                  <div style={{ 
+                                    fontSize: '0.75rem', 
+                                    color: '#a1a1aa',
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    {tk.reading}
+                                  </div>
+                                )}
+                                
+                                {/* Vietnamese meaning */}
+                                {vi && (
+                                  <div style={{ 
+                                    fontSize: '0.8rem', 
+                                    color: '#10b981',
+                                    fontWeight: '500',
+                                    backgroundColor: 'rgba(16,185,129,0.1)',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '0.25rem',
+                                    textAlign: 'center',
+                                    wordBreak: 'break-word',
+                                    maxWidth: '100%'
+                                  }}>
+                                    {vi}
+                                  </div>
+                                )}
+                                
+                                {/* Romaji */}
+                                {showRomaji && tk.romaji && (
+                                  <div style={{ 
+                                    fontSize: '0.7rem', 
+                                    color: '#6b7280',
+                                    marginTop: '0.25rem'
+                                  }}>
+                                    {tk.romaji}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        
+                        {/* Vietnamese translation */}
+                        {showVietnamese && currentSeg.vi && (
+                          <div style={{ 
+                            marginTop: '1rem', 
+                            fontSize: '1rem', 
+                            color: '#e4e4e7',
+                            textAlign: 'center',
+                            fontStyle: 'italic'
+                          }}>
+                            {currentSeg.vi}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* Normal mode */
+                      <div className={`overlay-panel ${highlightMode === 'B' && highlightModeBColorScheme === 'enhanced' ? 'highlight-mode-b-enhanced' : ''}`} style={{ backgroundColor: `rgba(0,0,0,${opacity})`, ['--sub-font-size']: `${subFontSize}px`, ['--sub-offset-y']: `${subOffsetY}px` }}>
+                        <div className={`subs-current highlight-intensity-${Math.round(highlightMode === 'B' ? highlightModeBIntensity * 10 : 20) / 10}`} data-hl={highlightTiming.enabled ? 'on' : 'off'}>
                       {(() => {
                         const viLines = splitViLines(currentSeg?.vi);
                         const sents = splitTokensBySentences(currentSeg.tokens);
@@ -1480,7 +2422,7 @@ export default function JPVideoSubApp() {
                               {line.map(([tk, i]) => {
                                 const isHighlightable = !isPunctToken(tk);
                                 const isActive = i === currentTokenIndex;
-                                const active = highlightEnabled && isActive && isHighlightable;
+                                    const active = highlightTiming.enabled && isActive && isHighlightable;
                                 return (
                                   <span
                                     key={i}
@@ -1511,6 +2453,172 @@ export default function JPVideoSubApp() {
                       })()}
                     </div>
                   </div>
+                )}
+
+                    {/* Khung dưới: Từ vựng của câu (chỉ hiển thị khi Mode B) */}
+                    {highlightMode !== 'B' && (
+                      <div style={{ 
+                        textAlign: 'center', 
+                        color: '#f59e0b', 
+                        fontSize: '0.8rem',
+                        padding: '1rem',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderRadius: '0.5rem',
+                        marginTop: '0.5rem',
+                        border: '1px solid rgba(245, 158, 11, 0.3)'
+                      }}>
+                        ⚠️ Chọn "Highlight B" để xem từ vựng
+              </div>
+                    )}
+                    {highlightMode === 'B' && (
+                      <div className="vocab-panel" style={{ 
+                        marginTop: '0.5rem', 
+                        backgroundColor: `rgba(0,0,0,${opacity * 0.8})`, 
+                        borderRadius: '1rem', 
+                        padding: '0.75rem',
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(63,63,70,0.3)',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                      }}>
+                        <div style={{ 
+                          fontSize: '0.875rem', 
+                          fontWeight: '600', 
+                          color: '#e4e4e7', 
+                          marginBottom: '0.5rem',
+                          textAlign: 'center',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span>📚</span>
+                          <span>Từ vựng câu hiện tại ({vocabEntries.length})</span>
+                        </div>
+                        {vocabEntries.length === 0 && (
+                          <div style={{ 
+                            textAlign: 'center', 
+                            color: '#a1a1aa', 
+                            fontSize: '0.8rem',
+                            padding: '1rem',
+                            fontStyle: 'italic'
+                          }}>
+                            Không có từ vựng NOUN/PROPN/VERB trong câu này
+                          </div>
+                        )}
+                        {vocabEntries.length > 0 && vocabEntries.every(entry => !entry.vi) && (
+                          <div style={{ 
+                            textAlign: 'center', 
+                            color: '#f59e0b', 
+                            fontSize: '0.8rem',
+                            padding: '1rem',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            borderRadius: '0.5rem',
+                            marginBottom: '0.5rem',
+                            border: '1px solid rgba(245, 158, 11, 0.3)'
+                          }}>
+                            ⚠️ Các từ này chưa có trong từ điển. Đang sử dụng từ điển có {Object.keys(jpViDict).length} từ.
+                          </div>
+                        )}
+                        <div style={{ 
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.5rem',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          paddingRight: '0.25rem'
+                        }}>
+                          {vocabEntries.map((entry, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              padding: '0.5rem',
+                              backgroundColor: 'rgba(39,39,42,0.6)',
+                              borderRadius: '0.5rem',
+                              border: '1px solid rgba(63,63,70,0.5)',
+                              transition: 'all 0.2s ease',
+                              cursor: 'pointer',
+                              minWidth: '80px',
+                              textAlign: 'center'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = 'rgba(59,130,246,0.2)';
+                              e.target.style.borderColor = 'rgba(59,130,246,0.5)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'rgba(39,39,42,0.6)';
+                              e.target.style.borderColor = 'rgba(63,63,70,0.5)';
+                            }}
+                            onClick={() => startEditVocab(entry, entry.tokenIndex, entry.segmentIndex)}>
+                              {/* Japanese token */}
+                              <div style={{ 
+                                fontSize: '1rem', 
+                                fontWeight: '600', 
+                                color: '#ffffff',
+                                marginBottom: '0.25rem'
+                              }}>
+                                {entry.surface}
+                              </div>
+                              
+                              {/* Reading */}
+                              {entry.reading && (
+                                <div style={{ 
+                                  fontSize: '0.75rem', 
+                                  color: '#a1a1aa',
+                                  marginBottom: '0.25rem'
+                                }}>
+                                  {entry.reading}
+                                </div>
+                              )}
+                              
+                              {/* Vietnamese meaning */}
+                              {entry.vi ? (
+                                <div style={{ 
+                                  fontSize: '0.8rem', 
+                                  color: '#10b981',
+                                  fontWeight: '500',
+                                  backgroundColor: 'rgba(16,185,129,0.1)',
+                                  padding: '0.25rem 0.5rem',
+                                  borderRadius: '0.25rem',
+                                  textAlign: 'center',
+                                  wordBreak: 'break-word',
+                                  maxWidth: '100%'
+                                }}>
+                                  {entry.vi}
+                                </div>
+                              ) : (
+                                <div style={{ 
+                                  fontSize: '0.8rem', 
+                                  color: '#6b7280',
+                                  textAlign: 'center',
+                                  lineHeight: '1.2',
+                                  fontStyle: 'italic',
+                                  marginTop: '0.1rem'
+                                }}>
+                                  (chưa có nghĩa)
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                          {vocabEntries.length === 0 && (
+                            <div style={{ 
+                              textAlign: 'center', 
+                              color: '#a1a1aa', 
+                              fontStyle: 'italic',
+                              padding: '1rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.5rem'
+                            }}>
+                              <span>📝</span>
+                              <span>Không có từ vựng trong câu này</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1558,9 +2666,18 @@ export default function JPVideoSubApp() {
           </div> */}
         </div>
 
-        {/* Transport & Settings */}
-        <div className="controls-row">
-          <div className="controls-left">
+        {/* Video Controls - Below Video */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '0.5rem', 
+          padding: '1rem', 
+          backgroundColor: 'rgba(39,39,42,0.3)', 
+          borderRadius: '0.75rem', 
+          border: '1px solid rgba(63,63,70,0.3)',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+          justifyContent: 'center'
+        }}>
             <button onClick={handlePlayPause} className="btn">
               {playing ? <Pause className="icon-4" /> : <Play className="icon-4" />}
               <span>{playing ? 'Pause' : 'Play'}</span>
@@ -1583,26 +2700,86 @@ export default function JPVideoSubApp() {
             </button>
             <button onClick={downloadSrt} className="btn">
               <DownloadIcon className="icon-4" />
-              <span>Tải SRT</span>
+              <span>Tải SRT (Mode {highlightMode})</span>
             </button>
+          <button onClick={downloadSrtWithVocab} className="btn">
+            <DownloadIcon className="icon-4" />
+            <span>Tải SRT + Vocab (Mode {highlightMode})</span>
+          </button>
+          <button onClick={downloadJson} className="btn">
+            <DownloadIcon className="icon-4" />
+            <span>Tải JSON (Mode {highlightMode})</span>
+          </button>
             <button onClick={recordVideoWithSub} className="btn" disabled={recording || (!videoURL && !imageURL)}>
               <DownloadIcon className="icon-4" />
-              <span>{recording ? 'Đang ghi...' : 'Tải video + sub'}</span>
+              <span>{recording ? 'Đang ghi...' : `Tải video + sub (Mode ${highlightMode})`}</span>
             </button>
           </div>
 
-          <div className="controls-right">
+        {/* Settings Row - Left Side */}
+        <div className="controls-row" style={{ justifyContent: 'flex-start' }}>
+          <div className="controls-right" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start', maxWidth: '800px' }}>
+            {/* Audio Controls */}
+            <div style={{ 
+              padding: '0.75rem', 
+              backgroundColor: 'rgba(39,39,42,0.3)', 
+              borderRadius: '0.5rem', 
+              border: '1px solid rgba(63,63,70,0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <Volume2 className="icon-4" />
+                <span style={{ fontWeight: '600', color: '#e4e4e7', fontSize: '0.875rem' }}>Audio</span>
+              </div>
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
             <div className="control-group">
-              <Highlighter className="icon-4" />
-              <span className="btn-label">Độ mờ nền</span>
-              <input type="range" min={0.4} max={1} step={0.02} value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="slider" />
+                  <span className="btn-label">Âm lượng</span>
+                  <input type="range" min={0} max={1} step={0.01} value={audioVolume} onChange={(e) => setAudioVolumeControl(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{Math.round(audioVolume * 100)}%</span>
             </div>
             <div className="control-group">
-              <Settings2 className="icon-4" />
               <span className="btn-label">Tốc độ</span>
               <input type="range" min={0.5} max={2} step={0.05} value={rate} onChange={(e) => setPlaybackRate(parseFloat(e.target.value))} className="slider" />
               <span className="rate-value">{rate.toFixed(2)}×</span>
             </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button onClick={toggleAudioMute} className={`btn-small ${audioMuted ? 'btn-active' : ''}`}>
+                    {audioMuted ? <VolumeX className="icon-4" /> : <Volume1 className="icon-4" />}
+                  </button>
+                  <button onClick={toggleAudioLoop} className={`btn-small ${audioLoop ? 'btn-active' : ''}`}>
+                    <RotateCcw className="icon-4" />
+                  </button>
+                  <label className="check-label" style={{ marginLeft: 'auto' }}>
+                    <input type="checkbox" checked={autoPauseEnabled} onChange={(e) => setAutoPauseEnabled(e.target.checked)} />
+                    <span className="btn-label">Tạm dừng 5s giữa câu</span>
+                  </label>
+                </div>
+                {autoPauseEnabled && (
+                  <div className="control-group">
+                    <span className="btn-label">Thời gian dừng (s)</span>
+                    <input type="range" min={1.0} max={10.0} step={0.5} value={pauseDuration} onChange={(e) => setPauseDuration(Number(e.target.value))} className="slider" />
+                    <span className="rate-value">{pauseDuration}s</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Display Controls */}
+            <div style={{ 
+              padding: '0.75rem', 
+              backgroundColor: 'rgba(39,39,42,0.3)', 
+              borderRadius: '0.5rem', 
+              border: '1px solid rgba(63,63,70,0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <Settings2 className="icon-4" />
+                <span style={{ fontWeight: '600', color: '#e4e4e7', fontSize: '0.875rem' }}>Display</span>
+              </div>
+              <div style={{ display: 'grid', gap: '0.5rem' }}>
+                <div className="control-group">
+                  <span className="btn-label">Độ mờ nền</span>
+                  <input type="range" min={0.4} max={1} step={0.02} value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{Math.round(opacity * 100)}%</span>
+                </div>
             <div className="control-group">
               <span className="btn-label">Cỡ chữ</span>
               <input type="range" min={12} max={36} step={1} value={subFontSize} onChange={(e) => setSubFontSize(parseInt(e.target.value))} className="slider" />
@@ -1613,8 +2790,24 @@ export default function JPVideoSubApp() {
               <input type="range" min={-200} max={200} step={1} value={subOffsetY} onChange={(e) => setSubOffsetY(parseInt(e.target.value))} className="slider" />
               <span className="rate-value">{subOffsetY}px</span>
             </div>
+              </div>
+            </div>
+
+            {/* Highlight Controls */}
+            <div style={{ 
+              padding: '0.75rem', 
+              backgroundColor: 'rgba(39,39,42,0.3)', 
+              borderRadius: '0.5rem', 
+              border: '1px solid rgba(63,63,70,0.3)',
+              gridColumn: '1 / -1'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <Highlighter className="icon-4" />
+                <span style={{ fontWeight: '600', color: '#e4e4e7', fontSize: '0.875rem' }}>Highlight Timing</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
             <div className="control-group">
-              <span className="btn-label">Bù trễ highlight</span>
+                  <span className="btn-label">Bù trễ</span>
               <input type="range" min={-1} max={1} step={0.005} value={highlightOffset} onChange={(e) => setHighlightOffset(parseFloat(e.target.value))} className="slider" />
               <span className="rate-value">{highlightOffset.toFixed(3)}s</span>
             </div>
@@ -1628,10 +2821,130 @@ export default function JPVideoSubApp() {
               <input type="range" min={0} max={0.2} step={0.005} value={punctSkip} onChange={(e) => setPunctSkip(parseFloat(e.target.value))} className="slider" />
               <span className="rate-value">{punctSkip.toFixed(3)}s</span>
             </div>
-            <label className="check-label">
+              </div>
+            </div>
+            {/* Highlight Mode Selection */}
+            <div className="control-group">
+              <span className="btn-label">Chế độ highlight</span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button 
+                  className="btn"
+                  onClick={() => setHighlightMode('A')}
+                  style={{ 
+                    padding: '0.25rem 0.75rem', 
+                    fontSize: '0.875rem',
+                    background: highlightMode === 'A' ? '#3b82f6' : '#27272a',
+                    color: highlightMode === 'A' ? '#fff' : '#e4e4e7'
+                  }}
+                >
+                  Mode A
+                </button>
+                <button 
+                  className="btn"
+                  onClick={() => setHighlightMode('B')}
+                  style={{ 
+                    padding: '0.25rem 0.75rem', 
+                    fontSize: '0.875rem',
+                    background: highlightMode === 'B' ? '#3b82f6' : '#27272a',
+                    color: highlightMode === 'B' ? '#fff' : '#e4e4e7'
+                  }}
+                >
+                  Mode B
+                </button>
+              </div>
+            </div>
+
+            {/* Mode A Settings */}
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'rgba(39,39,42,0.3)', 
+              borderRadius: '0.75rem', 
+              border: '1px solid rgba(63,63,70,0.3)',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <div style={{ 
+                  width: '8px', 
+                  height: '8px', 
+                  borderRadius: '50%', 
+                  backgroundColor: highlightMode === 'A' ? '#3b82f6' : '#6b7280' 
+                }}></div>
+                <span style={{ fontWeight: '600', color: '#e4e4e7' }}>Mode A Settings</span>
+                <label className="check-label" style={{ marginLeft: 'auto' }}>
               <input type="checkbox" checked={highlightEnabled} onChange={(e) => setHighlightEnabled(e.target.checked)} />
-              <span className="btn-label">Bật highlight</span>
+                  <span className="btn-label">Bật</span>
             </label>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="control-group">
+                  <span className="btn-label">Bù trễ</span>
+                  <input type="range" min={-1} max={1} step={0.005} value={highlightOffset} onChange={(e) => setHighlightOffset(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{highlightOffset.toFixed(3)}s</span>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Token lead</span>
+                  <input type="range" min={-0.5} max={0.5} step={0.005} value={tokenLead} onChange={(e) => setTokenLead(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{tokenLead.toFixed(3)}s</span>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Skip dấu câu</span>
+                  <input type="range" min={0} max={0.2} step={0.005} value={punctSkip} onChange={(e) => setPunctSkip(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{punctSkip.toFixed(3)}s</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mode B Settings */}
+            <div style={{ 
+              padding: '1rem', 
+              backgroundColor: 'rgba(39,39,42,0.3)', 
+              borderRadius: '0.75rem', 
+              border: '1px solid rgba(63,63,70,0.3)',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                <div style={{ 
+                  width: '8px', 
+                  height: '8px', 
+                  borderRadius: '50%', 
+                  backgroundColor: highlightMode === 'B' ? '#3b82f6' : '#6b7280' 
+                }}></div>
+                <span style={{ fontWeight: '600', color: '#e4e4e7' }}>Mode B Settings</span>
+                <label className="check-label" style={{ marginLeft: 'auto' }}>
+                  <input type="checkbox" checked={highlightModeBEnabled} onChange={(e) => setHighlightModeBEnabled(e.target.checked)} />
+                  <span className="btn-label">Bật</span>
+                </label>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="control-group">
+                  <span className="btn-label">Bù trễ</span>
+                  <input type="range" min={-1} max={1} step={0.005} value={highlightModeBOffset} onChange={(e) => setHighlightModeBOffset(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{highlightModeBOffset.toFixed(3)}s</span>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Token lead</span>
+                  <input type="range" min={-0.5} max={0.5} step={0.005} value={highlightModeBTokenLead} onChange={(e) => setHighlightModeBTokenLead(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{highlightModeBTokenLead.toFixed(3)}s</span>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Skip dấu câu</span>
+                  <input type="range" min={0} max={0.2} step={0.005} value={highlightModeBPunctSkip} onChange={(e) => setHighlightModeBPunctSkip(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{highlightModeBPunctSkip.toFixed(3)}s</span>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Cường độ</span>
+                  <input type="range" min={0.5} max={3} step={0.1} value={highlightModeBIntensity} onChange={(e) => setHighlightModeBIntensity(parseFloat(e.target.value))} className="slider" />
+                  <span className="rate-value">{highlightModeBIntensity.toFixed(1)}x</span>
+                </div>
+                <div className="control-group" style={{ gridColumn: '1 / -1' }}>
+                  <span className="btn-label">Bảng màu</span>
+                  <select value={highlightModeBColorScheme} onChange={(e) => setHighlightModeBColorScheme(e.target.value)} style={{ padding: '0.5rem 0.75rem', borderRadius: '0.75rem', background: '#27272a', color: '#e4e4e7', border: '1px solid #3f3f46', width: '100%' }}>
+                    <option value="original">Original</option>
+                    <option value="enhanced">Enhanced</option>
+                  </select>
+                </div>
+              </div>
+            </div>
             <label className="check-label">
               <input type="checkbox" checked={showFurigana} onChange={(e) => setShowFurigana(e.target.checked)} />
               <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Type className="icon-4" /> Furigana</span>
@@ -1648,6 +2961,10 @@ export default function JPVideoSubApp() {
               <input type="checkbox" checked={subCentered} onChange={(e) => setSubCentered(e.target.checked)} />
               <span className="btn-label">Sub giữa màn hình</span>
             </label>
+            <label className="check-label">
+              <input type="checkbox" checked={tokenByTokenMode} onChange={(e) => setTokenByTokenMode(e.target.checked)} />
+              <span className="btn-label">Token-by-token mode</span>
+            </label>
           </div>
         </div>
 
@@ -1655,7 +2972,10 @@ export default function JPVideoSubApp() {
         <div className="segments-panel">
           <div className="segments-header">
             <h2 className="app-title" style={{ fontSize: '1.125rem' }}>Danh sách câu</h2>
-            <span className="now-badge">Now: {secondsToTimestamp(Math.max(0, simTime))}{mediaDuration ? ` / ${secondsToTimestamp(mediaDuration)}` : ''}</span>
+            <span className="now-badge">
+              Now: {secondsToTimestamp(Math.max(0, simTime))}{mediaDuration ? ` / ${secondsToTimestamp(mediaDuration)}` : ''}
+              {isAutoPaused && <span style={{ color: '#f59e0b', marginLeft: '0.5rem' }}>⏸️ Tạm dừng</span>}
+            </span>
           </div>
           <div className="segment-list">
             {data.segments.map((s, si) => (
@@ -1772,8 +3092,145 @@ export default function JPVideoSubApp() {
       {/* Trends Tool */}
       <TrendsToolSimple isOpen={trendsOpen} onClose={() => setTrendsOpen(false)} />
       
-      {/* AI Video Tool */}
-      <AIVideoTool isOpen={aiVideoOpen} onClose={() => setAiVideoOpen(false)} />
+      {/* Vocabulary Edit Modal */}
+      {editingVocab && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(39,39,42,0.95)',
+            borderRadius: '1rem',
+            padding: '2rem',
+            border: '1px solid rgba(63,63,70,0.5)',
+            minWidth: '400px',
+            maxWidth: '600px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{
+              color: '#ffffff',
+              marginBottom: '1rem',
+              textAlign: 'center',
+              fontSize: '1.25rem',
+              fontWeight: '600'
+            }}>
+              Chỉnh sửa từ vựng
+            </h3>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{
+                display: 'block',
+                color: '#d4d4d8',
+                marginBottom: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Từ tiếng Nhật:
+              </label>
+              <div style={{
+                backgroundColor: 'rgba(63,63,70,0.5)',
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                color: '#ffffff',
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                textAlign: 'center'
+              }}>
+                {editingVocab.surface}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{
+                display: 'block',
+                color: '#d4d4d8',
+                marginBottom: '0.5rem',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}>
+                Nghĩa tiếng Việt:
+              </label>
+              <input
+                type="text"
+                value={editingVocab.vi}
+                onChange={(e) => setEditingVocab(prev => ({ ...prev, vi: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: 'rgba(63,63,70,0.5)',
+                  border: '1px solid rgba(107,114,128,0.5)',
+                  borderRadius: '0.5rem',
+                  color: '#ffffff',
+                  fontSize: '1rem',
+                  outline: 'none'
+                }}
+                placeholder="Nhập nghĩa tiếng Việt..."
+                autoFocus
+              />
+            </div>
+
+            <div style={{
+              display: 'flex',
+              gap: '0.75rem',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={cancelVocabEdit}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: 'rgba(107,114,128,0.5)',
+                  border: '1px solid rgba(107,114,128,0.5)',
+                  borderRadius: '0.5rem',
+                  color: '#d4d4d8',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(107,114,128,0.7)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'rgba(107,114,128,0.5)';
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                onClick={saveVocabEdit}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  backgroundColor: 'rgba(59,130,246,0.8)',
+                  border: '1px solid rgba(59,130,246,1)',
+                  borderRadius: '0.5rem',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(37,99,235,0.8)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'rgba(59,130,246,0.8)';
+                }}
+              >
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 }

@@ -31,9 +31,10 @@ const AIVideoTool = ({ isOpen, onClose }) => {
     try {
       const response = await fetch('http://localhost:8000/api/ai-video/platforms');
       const data = await response.json();
-      setAvailablePlatforms(data.platforms);
+      setAvailablePlatforms(data.platforms || ['demo']);
     } catch (err) {
       console.error('Error loading platforms:', err);
+      setAvailablePlatforms(['demo']); // Fallback
     }
   };
 
@@ -41,9 +42,10 @@ const AIVideoTool = ({ isOpen, onClose }) => {
     try {
       const response = await fetch('http://localhost:8000/api/ai-video/styles');
       const data = await response.json();
-      setAvailableStyles(data.styles);
+      setAvailableStyles(data.styles || ['realistic', 'animated', 'cinematic']);
     } catch (err) {
       console.error('Error loading styles:', err);
+      setAvailableStyles(['realistic', 'animated', 'cinematic']); // Fallback
     }
   };
 
@@ -51,9 +53,10 @@ const AIVideoTool = ({ isOpen, onClose }) => {
     try {
       const response = await fetch('http://localhost:8000/api/ai-video/aspect-ratios');
       const data = await response.json();
-      setAvailableAspectRatios(data.aspect_ratios);
+      setAvailableAspectRatios(data.aspect_ratios || ['16:9', '9:16', '1:1']);
     } catch (err) {
       console.error('Error loading aspect ratios:', err);
+      setAvailableAspectRatios(['16:9', '9:16', '1:1']); // Fallback
     }
   };
 
@@ -95,16 +98,21 @@ const AIVideoTool = ({ isOpen, onClose }) => {
       formData.append('style', style);
       formData.append('aspect_ratio', aspectRatio);
 
+      console.log('Sending request to generate video...');
+      
       const response = await fetch('http://localhost:8000/api/ai-video/generate', {
         method: 'POST',
         body: formData
       });
+
+      console.log('Response received:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (data.success) {
         setResult(data);
@@ -117,6 +125,7 @@ const AIVideoTool = ({ isOpen, onClose }) => {
       setError('Connection error: ' + err.message);
     } finally {
       setIsLoading(false);
+      console.log('Loading finished');
     }
   };
 
@@ -142,16 +151,21 @@ const AIVideoTool = ({ isOpen, onClose }) => {
       formData.append('duration', duration.toString());
       formData.append('platform', platform);
 
+      console.log('Sending request to generate video from image...');
+      
       const response = await fetch('http://localhost:8000/api/ai-video/generate-from-image', {
         method: 'POST',
         body: formData
       });
+
+      console.log('Response received:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (data.success) {
         setResult(data);
@@ -164,6 +178,7 @@ const AIVideoTool = ({ isOpen, onClose }) => {
       setError('Connection error: ' + err.message);
     } finally {
       setIsLoading(false);
+      console.log('Loading finished');
     }
   };
 

@@ -1,5 +1,5 @@
 @echo off
-echo Starting Backend Server...
-cd /d "%~dp0"
+echo Starting AI Video Backend...
+cd /d "%~dp0backend"
 python main_simple.py
 pause

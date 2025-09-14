@@ -316,17 +316,37 @@ class AIVideoService:
     
     def _create_demo_video_file(self, output_path: Path, prompt: str, duration: int):
         """Tạo file demo video"""
-        # Tạo file video demo đơn giản
-        # Trong thực tế, có thể sử dụng FFmpeg hoặc thư viện khác
+        # Tạo file video demo đơn giản bằng FFmpeg
+        try:
+            import subprocess
+            
+            # Tạo video demo với FFmpeg (nếu có)
+            cmd = [
+                'ffmpeg', '-f', 'lavfi', 
+                '-i', f'color=c=blue:size=640x480:duration={duration}',
+                '-vf', f'drawtext=text=\'{prompt}\':fontsize=24:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2',
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                '-y', str(output_path)
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                return  # FFmpeg thành công
+                
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+            pass  # Fallback to text file
+        
+        # Fallback: Tạo file text nếu FFmpeg không có
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(f"# Demo AI Video\n")
             f.write(f"Prompt: {prompt}\n")
             f.write(f"Duration: {duration}s\n")
             f.write(f"Generated at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Note: This is a demo file. Install FFmpeg for real video generation.\n")
     
     def _create_demo_video_from_image_file(self, output_path: Path, image_path: str, prompt: str, duration: int):
         """Tạo file demo video từ ảnh"""
-        with open(output_path, 'w') as f:
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(f"# Demo AI Video from Image\n")
             f.write(f"Image: {image_path}\n")
             f.write(f"Prompt: {prompt}\n")
