@@ -220,6 +220,20 @@
 .subs-current { line-height: 1.5; font-weight: 600; font-size: var(--sub-font-size, 12px); }
 .subs-current[data-hl="off"] .token-inner { background-color: transparent !important; }
 .subs-current[data-hl="off"] .token-ring { outline: none !important; }
+
+/* When highlight is off, all tokens should have the same color */
+.subs-current[data-hl="off"] .pos-token .token-inner { 
+  background-color: transparent !important; 
+  color: #ffffff !important;
+}
+.subs-current[data-hl="off"] .pos-token[data-active="true"] .token-inner { 
+  background-color: transparent !important; 
+  color: #ffffff !important;
+}
+.subs-current[data-hl="off"] .token-active {
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
 .token-line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 3px; justify-content: center; }
 .token-line ruby { display: inline-flex; flex-direction: column; align-items: center; }
 .token-line rt { line-height: 1; margin-bottom: 2px; }

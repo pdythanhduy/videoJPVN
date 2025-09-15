@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duration Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 3px; }
+        button { margin: 5px; padding: 10px 15px; }
+    </style>
+</head>
+<body>
+    <h1>Duration Debug Test</h1>
+    
+    <div class="test-case">
+        <h3>Test Case 1: JSON Duration Calculation</h3>
+        <button onclick="testJsonDuration()">Test JSON Duration</button>
+        <div id="result1" class="result"></div>
+    </div>
+    
+    <div class="test-case">
+        <h3>Test Case 2: Video vs JSON Priority</h3>
+        <button onclick="testPriority()">Test Priority Logic</button>
+        <div id="result2" class="result"></div>
+    </div>
+
+    <script>
+        // Test JSON duration calculation
+        function testJsonDuration() {
+            const testData = {
+                segments: [
+                    { start: 0, end: 5 },
+                    { start: 5, end: 10 },
+                    { start: 10, end: 15 }
+                ]
+            };
+            
+            const totalDuration = Math.max(...testData.segments.map(s => s.end || 0));
+            document.getElementById('result1').innerHTML = `
+                <strong>JSON Duration Test:</strong><br>
+                Segments: ${JSON.stringify(testData.segments)}<br>
+                Calculated Duration: ${totalDuration} seconds<br>
+                Expected: 15 seconds
+            `;
+        }
+        
+        // Test priority logic
+        function testPriority() {
+            const scenarios = [
+                {
+                    name: "Audio present",
+                    hasAudio: true,
+                    hasData: true,
+                    videoDuration: 20,
+                    jsonDuration: 15,
+                    expected: "Audio duration (20s)"
+                },
+                {
+                    name: "No audio, has JSON data",
+                    hasAudio: false,
+                    hasData: true,
+                    videoDuration: 20,
+                    jsonDuration: 15,
+                    expected: "JSON duration (15s)"
+                },
+                {
+                    name: "No audio, no data",
+                    hasAudio: false,
+                    hasData: false,
+                    videoDuration: 20,
+                    jsonDuration: 0,
+                    expected: "Video duration (20s)"
+                }
+            ];
+            
+            let result = "<strong>Priority Logic Test:</strong><br>";
+            scenarios.forEach(scenario => {
+                let actual;
+                if (scenario.hasAudio) {
+                    actual = `Audio duration (${scenario.videoDuration}s)`;
+                } else if (scenario.hasData) {
+                    actual = `JSON duration (${scenario.jsonDuration}s)`;
+                } else {
+                    actual = `Video duration (${scenario.videoDuration}s)`;
+                }
+                
+                result += `${scenario.name}: ${actual} ✓<br>`;
+            });
+            
+            document.getElementById('result2').innerHTML = result;
+        }
+        
+        // Auto-run tests
+        window.onload = function() {
+            testJsonDuration();
+            testPriority();
+        };
+    </script>
+</body>
+</html>

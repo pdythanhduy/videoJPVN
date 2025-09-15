@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Analysis Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a2a;
+        }
+        .token {
+            display: inline-block;
+            margin: 2px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #444;
+            border: 1px solid #666;
+        }
+        .token.active {
+            background: #3b82f6;
+            border-color: #60a5fa;
+        }
+        .highlight-test {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Token Analysis Test</h1>
+        
+        <div class="test-section">
+            <h2>JSON Data Analysis</h2>
+            <p>Testing the specific token "驚いて" from your JSON data.</p>
+            
+            <div id="json-analysis"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Expected vs Actual</h2>
+            <p>What should happen vs what actually happens.</p>
+            
+            <div id="comparison"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Highlight Simulation</h2>
+            <p>Simulating how tokens would be highlighted.</p>
+            
+            <div id="highlight-simulation"></div>
+        </div>
+    </div>
+
+    <script>
+        // Your JSON data
+        const testData = {
+            "ja_lines": [
+                "学生は驚いて「はい」と返事しました"
+            ],
+            "tokens": [
+                {
+                    "ja": "学生は",
+                    "reading": "がくせいは",
+                    "pos": "",
+                    "vi": "sinh viên"
+                },
+                {
+                    "ja": "驚いて",
+                    "reading": "おどろいて",
+                    "pos": "",
+                    "vi": "giật mình"
+                },
+                {
+                    "ja": "「はい」と",
+                    "reading": "「はい」と",
+                    "pos": "",
+                    "vi": "\"Vâng ạ\""
+                },
+                {
+                    "ja": "返事しました",
+                    "reading": "へんじしました",
+                    "pos": "",
+                    "vi": "đã trả lời"
+                }
+            ]
+        };
+
+        // Simulate the vocabulary extraction logic
+        function extractVocabulary(tokens) {
+            const vocabEntries = [];
+            const seen = new Set();
+            
+            for (const tk of tokens) {
+                const pos = String(tk?.pos || '').toUpperCase();
+                const surface = String(tk?.surface || '').trim();
+                if (!surface || seen.has(surface)) continue;
+                
+                // Check if token has Vietnamese translation or is a meaningful word
+                const vi = String(tk?.vi || '').trim();
+                if (!vi) continue;
+                
+                // Filter meaningful words: either has POS tag or has translation
+                const isMeaningful = pos === 'NOUN' || pos === 'PROPN' || pos === 'VERB' || 
+                                    pos === 'ADJ' || pos === 'ADV' || pos === 'PRON' ||
+                                    pos === 'PARTICLE' || pos === 'AUX' || pos === 'NUM' ||
+                                    pos === 'COUNTER' || pos === 'SYMBOL' || pos === 'OTHER' ||
+                                    vi.length > 0; // Any token with translation
+                
+                if (!isMeaningful) continue;
+                
+                seen.add(surface);
+                vocabEntries.push({
+                    surface,
+                    reading: String(tk?.reading || '').trim(),
+                    vi,
+                    pos: pos || 'OTHER'
+                });
+            }
+            
+            return vocabEntries;
+        }
+
+        // Simulate Kuromoji-like tokenization (what might happen if re-tokenized)
+        function simulateKuromojiTokenization(text) {
+            // This is a simplified simulation - real Kuromoji might split differently
+            const kuromojiResult = [
+                { surface: "学生", reading: "がくせい", pos: "NOUN", vi: "sinh viên" },
+                { surface: "は", reading: "は", pos: "PARTICLE", vi: "(trợ từ)" },
+                { surface: "驚い", reading: "おどろい", pos: "VERB", vi: "giật mình (gốc động từ)" },
+                { surface: "て", reading: "て", pos: "PARTICLE", vi: "(hậu tố te-form)" },
+                { surface: "「はい」", reading: "「はい」", pos: "PUNCT", vi: "\"Vâng ạ\"" },
+                { surface: "と", reading: "と", pos: "PARTICLE", vi: "(trợ từ)" },
+                { surface: "返事", reading: "へんじ", pos: "NOUN", vi: "trả lời" },
+                { surface: "し", reading: "し", pos: "VERB", vi: "làm (gốc động từ)" },
+                { surface: "ました", reading: "ました", pos: "AUX", vi: "(thì quá khứ)" }
+            ];
+            return kuromojiResult;
+        }
+
+        // Display results
+        const jsonDiv = document.getElementById('json-analysis');
+        const comparisonDiv = document.getElementById('comparison');
+        const highlightDiv = document.getElementById('highlight-simulation');
+
+        // JSON analysis
+        jsonDiv.innerHTML = `
+            <h3>Original JSON Tokens:</h3>
+            <div style="margin: 10px 0;">
+                ${testData.tokens.map((token, idx) => `
+                    <div class="token" style="margin: 2px;">
+                        <strong>${token.ja}</strong><br>
+                        <small>${token.reading}</small><br>
+                        <small style="color: #10b981;">${token.vi}</small><br>
+                        <small style="color: #fbbf24;">POS: ${token.pos || 'EMPTY'}</small>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <h3>Vocabulary Extraction Result:</h3>
+            <div style="margin: 10px 0;">
+                ${extractVocabulary(testData.tokens).map(entry => `
+                    <div class="token" style="margin: 2px; background: #3b82f6;">
+                        <strong>${entry.surface}</strong><br>
+                        <small>${entry.reading}</small><br>
+                        <small style="color: #10b981;">${entry.vi}</small><br>
+                        <small style="color: #fbbf24;">${entry.pos}</small>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Comparison
+        const kuromojiTokens = simulateKuromojiTokenization(testData.ja_lines[0]);
+        comparisonDiv.innerHTML = `
+            <h3>If Re-tokenized with Kuromoji (simulated):</h3>
+            <div style="margin: 10px 0;">
+                ${kuromojiTokens.map((token, idx) => `
+                    <div class="token" style="margin: 2px; background: #f43f5e;">
+                        <strong>${token.surface}</strong><br>
+                        <small>${token.reading}</small><br>
+                        <small style="color: #10b981;">${token.vi}</small><br>
+                        <small style="color: #fbbf24;">${token.pos}</small>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <h3>Key Difference:</h3>
+            <div style="background: #444; padding: 10px; border-radius: 4px;">
+                <p><strong>JSON:</strong> "驚いて" (1 token) → "giật mình"</p>
+                <p><strong>Kuromoji:</strong> "驚い" + "て" (2 tokens) → "giật mình (gốc)" + "(hậu tố)"</p>
+                <p style="color: #fbbf24;"><strong>Problem:</strong> Highlighting splits the word into parts!</p>
+            </div>
+        `;
+
+        // Highlight simulation
+        highlightDiv.innerHTML = `
+            <h3>Highlight Simulation (JSON tokens):</h3>
+            <div class="highlight-test">
+                <p>Original sentence: ${testData.ja_lines[0]}</p>
+                <div style="margin: 10px 0;">
+                    ${testData.tokens.map((token, idx) => `
+                        <span class="token ${idx === 1 ? 'active' : ''}" style="margin: 2px;">
+                            ${token.ja}
+                        </span>
+                    `).join('')}
+                </div>
+                <p><em>Highlighting "驚いて" as one unit ✓</em></p>
+            </div>
+            
+            <h3>Highlight Simulation (Kuromoji tokens):</h3>
+            <div class="highlight-test">
+                <p>Re-tokenized sentence: ${kuromojiTokens.map(t => t.surface).join('')}</p>
+                <div style="margin: 10px 0;">
+                    ${kuromojiTokens.map((token, idx) => `
+                        <span class="token ${idx === 2 ? 'active' : ''}" style="margin: 2px;">
+                            ${token.surface}
+                        </span>
+                    `).join('')}
+                </div>
+                <p><em>Highlighting only "驚い" (missing "て") ✗</em></p>
+            </div>
+        `;
+
+        console.log('Analysis Results:', {
+            originalTokens: testData.tokens,
+            extractedVocab: extractVocabulary(testData.tokens),
+            kuromojiTokens: kuromojiTokens
+        });
+    </script>
+</body>
+</html>

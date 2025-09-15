@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlight Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            background: #2a2a2a;
+        }
+        .token {
+            display: inline-block;
+            margin: 2px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: #444;
+            border: 1px solid #666;
+        }
+        .token.active {
+            background: #3b82f6;
+            border-color: #60a5fa;
+        }
+        .token.noun { background: #3b82f6; }
+        .token.verb { background: #f43f5e; }
+        .token.other { background: #6b7280; }
+        .vocab-item {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px;
+            border-radius: 6px;
+            background: #374151;
+            border: 1px solid #4b5563;
+            min-width: 120px;
+            text-align: center;
+        }
+        .jp-text { color: #ffffff; font-weight: bold; }
+        .reading-text { color: #d1d5db; font-size: 0.9em; }
+        .vi-text { color: #10b981; font-size: 0.9em; }
+        .pos-tag { color: #fbbf24; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Highlight Debug Test</h1>
+        
+        <div class="test-section">
+            <h2>JSON Data Analysis</h2>
+            <p>Testing with the provided JSON data to see which tokens would be highlighted and included in vocabulary.</p>
+            
+            <div id="analysis-results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Vocabulary Extraction Test</h2>
+            <p>Testing vocabulary extraction logic with the JSON data.</p>
+            
+            <div id="vocab-results"></div>
+        </div>
+    </div>
+
+    <script>
+        // JSON data from user
+        const testData = {
+            "audio": "C:\\Users\\thanh\\python\\videohoathinh\\tiêngnhat\\ある大学の寮で.wav",
+            "backend": "heuristic",
+            "only_nouns_verbs": true,
+            "items": [
+                {
+                    "index": "1",
+                    "timecode": "00:00:00,000 --> 00:00:08,720",
+                    "ja_lines": [
+                        "ある大学の寮で不思議な出来事がよく起こると言われています 夜になると廊下から足音が聞こえてきます"
+                    ],
+                    "vi_lines": [
+                        "Người ta nói rằng ở ký túc xá của một trường đại học nọ, những chuyện kỳ lạ thường xuyên xảy ra. Cứ đêm đến là lại nghe thấy tiếng bước chân từ hành lang."
+                    ],
+                    "tokens": [
+                        {
+                            "ja": "ある大学の寮で",
+                            "reading": "あるだいがくのりょうで",
+                            "pos": "",
+                            "vi": "ở ký túc xá của một trường đại học nọ"
+                        },
+                        {
+                            "ja": "不思議な出来事",
+                            "reading": "ふしぎなできごと",
+                            "pos": "",
+                            "vi": "những chuyện kỳ lạ"
+                        },
+                        {
+                            "ja": "が",
+                            "reading": "が",
+                            "pos": "",
+                            "vi": "(trợ từ)"
+                        },
+                        {
+                            "ja": "よく",
+                            "reading": "よく",
+                            "pos": "",
+                            "vi": "thường xuyên"
+                        },
+                        {
+                            "ja": "起こる",
+                            "reading": "おこる",
+                            "pos": "",
+                            "vi": "xảy ra"
+                        },
+                        {
+                            "ja": "と",
+                            "reading": "と",
+                            "pos": "",
+                            "vi": "là"
+                        },
+                        {
+                            "ja": "言われています",
+                            "reading": "いわれています",
+                            "pos": "",
+                            "vi": "người ta nói rằng"
+                        },
+                        {
+                            "ja": "夜になると",
+                            "reading": "よるになると",
+                            "pos": "",
+                            "vi": "cứ đêm đến"
+                        },
+                        {
+                            "ja": "廊下から",
+                            "reading": "ろうかから",
+                            "pos": "",
+                            "vi": "từ hành lang"
+                        },
+                        {
+                            "ja": "足音",
+                            "reading": "あしおと",
+                            "pos": "",
+                            "vi": "tiếng bước chân"
+                        },
+                        {
+                            "ja": "が",
+                            "reading": "が",
+                            "pos": "",
+                            "vi": "(trợ từ)"
+                        },
+                        {
+                            "ja": "聞こえてきます",
+                            "reading": "きこえてきます",
+                            "pos": "",
+                            "vi": "nghe thấy"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // Simulate the vocabulary extraction logic
+        function extractVocabulary(seg) {
+            const vocabEntries = [];
+            const seen = new Set();
+            
+            for (const tk of seg.tokens) {
+                const pos = String(tk?.pos || '').toUpperCase();
+                const surface = String(tk?.surface || '').trim();
+                if (!surface || seen.has(surface)) continue;
+                
+                // Check if token has Vietnamese translation or is a meaningful word
+                const vi = String(tk?.vi || '').trim();
+                if (!vi) continue;
+                
+                // Filter meaningful words: either has POS tag or has translation
+                const isMeaningful = pos === 'NOUN' || pos === 'PROPN' || pos === 'VERB' || 
+                                    pos === 'ADJ' || pos === 'ADV' || pos === 'PRON' ||
+                                    pos === 'PARTICLE' || pos === 'AUX' || pos === 'NUM' ||
+                                    pos === 'COUNTER' || pos === 'SYMBOL' || pos === 'OTHER' ||
+                                    vi.length > 0; // Any token with translation
+                
+                if (!isMeaningful) continue;
+                
+                seen.add(surface);
+                vocabEntries.push({
+                    surface,
+                    reading: String(tk?.reading || '').trim(),
+                    vi,
+                    pos: pos || 'OTHER'
+                });
+            }
+            
+            return vocabEntries;
+        }
+
+        // Test the logic
+        const segment = testData.items[0];
+        const vocabEntries = extractVocabulary(segment);
+
+        // Display results
+        const analysisDiv = document.getElementById('analysis-results');
+        const vocabDiv = document.getElementById('vocab-results');
+
+        // Analysis results
+        analysisDiv.innerHTML = `
+            <h3>Token Analysis for Segment 1:</h3>
+            <p>Total tokens: ${segment.tokens.length}</p>
+            <div style="margin: 10px 0;">
+                ${segment.tokens.map((token, idx) => `
+                    <div class="token ${token.pos ? token.pos.toLowerCase() : 'other'}" style="margin: 2px;">
+                        <strong>${token.ja}</strong><br>
+                        <small>${token.reading}</small><br>
+                        <small style="color: #10b981;">${token.vi}</small><br>
+                        <small style="color: #fbbf24;">POS: ${token.pos || 'EMPTY'}</small>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Vocabulary results
+        vocabDiv.innerHTML = `
+            <h3>Extracted Vocabulary (${vocabEntries.length} items):</h3>
+            <div style="margin: 10px 0;">
+                ${vocabEntries.map(entry => `
+                    <div class="vocab-item">
+                        <div class="jp-text">${entry.surface}</div>
+                        <div class="reading-text">${entry.reading}</div>
+                        <div class="vi-text">${entry.vi}</div>
+                        <div class="pos-tag">${entry.pos}</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        console.log('Test Results:', {
+            totalTokens: segment.tokens.length,
+            extractedVocab: vocabEntries.length,
+            vocabEntries: vocabEntries
+        });
+    </script>
+</body>
+</html>

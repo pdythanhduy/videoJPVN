@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 // Local STT (no API)
 let localTranscribePipeline = null;
 import * as wanakana from 'wanakana';
+
+// Simple Japanese-Vietnamese dictionary (replacing jp-vi-dictionary.js)
+const jpViDict = {};
 import { Play, Pause, Upload, RefreshCw, Settings2, Wand2, BookOpenText, Type, Languages, Highlighter, Download as DownloadIcon, Volume2, VolumeX, Volume1, FileText, TrendingUp, RotateCcw, FastForward, Rewind } from "lucide-react";
 import "./App.css";
-import { jpViDict } from './jp-vi-dictionary.js';
 import TTSPanel from './components/TTSPanel';
 import AudioFilesList from './components/AudioFilesList';
 import YouTubeDownloader from './components/YouTubeDownloader';
@@ -116,8 +118,8 @@ function posClass(pos, map) {
 }
 
 function isPunctToken(token) {
-  const key = String(token?.pos || '').toUpperCase();
-  return key === 'PUNCT';
+  // Không bỏ qua bất kỳ token nào - highlight tất cả
+  return false;
 }
 
 // Chia token thành các dòng theo dấu câu kết thúc câu ("。" hoặc ".")
@@ -265,6 +267,7 @@ export default function JPVideoSubApp() {
   
   // Highlight Mode B custom settings
   const [highlightModeBEnabled, setHighlightModeBEnabled] = useState(true);
+  const [showSettings, setShowSettings] = useState(true);
   const [highlightModeBOffset, setHighlightModeBOffset] = useState(-0.3); // seconds
   const [highlightModeBTokenLead, setHighlightModeBTokenLead] = useState(-0.15); // seconds
   const [highlightModeBPunctSkip, setHighlightModeBPunctSkip] = useState(0.08); // seconds
@@ -1216,8 +1219,8 @@ export default function JPVideoSubApp() {
           const pos = String(tk?.pos || '').toUpperCase();
           // Use highlight mode settings to determine which POS to include
           const shouldInclude = highlightMode === 'A' 
-            ? (pos === 'NOUN' || pos === 'PROPN')
-            : (pos === 'NOUN' || pos === 'PROPN' || pos === 'VERB');
+            ? (pos !== 'PUNCT' && pos !== 'PARTICLE' && pos !== 'SYMBOL')
+            : (pos !== 'PUNCT' && pos !== 'PARTICLE' && pos !== 'SYMBOL');
           
           if (!shouldInclude) continue;
           const surface = String(tk?.surface || '').trim();
@@ -1232,7 +1235,7 @@ export default function JPVideoSubApp() {
         
         if (vocabEntries.length > 0) {
           lines.push(''); // Empty line before vocab
-          lines.push(`<!-- VOCAB (${highlightMode === 'A' ? 'NOUN/PROPN' : 'NOUN/PROPN/VERB'}):`);
+          lines.push(`<!-- VOCAB (tất cả từ vựng):`);
           vocabEntries.forEach(entry => lines.push(`  ${entry}`));
           lines.push('-->');
         }
@@ -1395,9 +1398,11 @@ export default function JPVideoSubApp() {
     let chunks = [];
     const mimeCandidates = [
       'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8,opus', 
       'video/webm;codecs=vp9',
       'video/webm;codecs=vp8',
+      'video/mp4;codecs=h264,aac',
+      'video/mp4;codecs=h264',
       'video/webm'
     ];
     let mime = '';
@@ -1409,7 +1414,8 @@ export default function JPVideoSubApp() {
       videoBitsPerSecond: 4_000_000,
       audioBitsPerSecond: 128_000,
       streamActive: stream.active,
-      streamTracks: stream.getTracks().length
+      streamTracks: stream.getTracks().length,
+      supportedTypes: mimeCandidates.filter(t => MediaRecorder.isTypeSupported(t))
     });
     
     rec.ondataavailable = (e) => { 
@@ -1419,11 +1425,16 @@ export default function JPVideoSubApp() {
     
     rec.onstop = () => {
       console.log('MediaRecorder stopped, chunks:', chunks.length, 'total size:', chunks.reduce((s, c) => s + c.size, 0));
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      console.log('Using mimeType:', mime);
+      const blob = new Blob(chunks, { type: mime || 'video/webm' });
       console.log('Blob created:', blob.size, 'bytes');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `video_with_sub_mode_${highlightMode.toLowerCase()}.webm`;
+      a.href = url; 
+      
+      // Use correct file extension based on mimeType
+      const extension = mime?.includes('mp4') ? 'mp4' : 'webm';
+      a.download = `video_with_sub_mode_${highlightMode.toLowerCase()}.${extension}`;
       document.body.appendChild(a); a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
       setRecording(false);
@@ -1606,7 +1617,7 @@ export default function JPVideoSubApp() {
       ctx.textBaseline = 'top';
       const outerMargin = Math.round(8 * scale);
       const panelW = width - outerMargin * 2; // total panel width inside outer margins
-      const innerW = panelW - outerMargin * 2; // preserve spacing similar to UI
+      let innerW = panelW - outerMargin * 2; // preserve spacing similar to UI
       const x0 = outerMargin; // panel left
       const contentW = innerW - 2 * padX; // content area width inside panel
       const centerX = x0 + padX + Math.round(contentW / 2);
@@ -1640,6 +1651,14 @@ export default function JPVideoSubApp() {
       const segOffset = segOffsets[actualSegIdx] || 0;
       const rel = (tNow + currentHighlightTiming.tokenLead + segOffset) - seg.start;
       const activeIdx = getActiveTokenIndex(seg, rel, currentHighlightTiming.punctSkip);
+      console.log('Highlight debug:', {
+        segIndex: actualSegIdx,
+        rel: rel.toFixed(2),
+        activeIdx: activeIdx,
+        totalTokens: seg.tokens?.length || 0,
+        currentToken: seg.tokens?.[activeIdx] || null,
+        highlightEnabled: currentHighlightTiming.enabled
+      });
 
       // Precompute sentences
       const sents = splitTokensBySentences(segTokens);
@@ -1716,7 +1735,7 @@ export default function JPVideoSubApp() {
       const jpBlockH = jpViLayouts.reduce((s, it) => s + it.jpBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * sentenceGap);
       const viBlockH = jpViLayouts.reduce((s, it) => s + it.viBlockH, 0) + Math.max(0, (jpViLayouts.length - 1) * Math.round(2 * scale));
       
-      const boxH = padY + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
+      let boxH = padY + jpBlockH + (viBlockH ? Math.round(6 * scale) : 0) + viBlockH + padY;
       const bottomMargin = Math.round(36 * scale);
       const offsetY = Math.round(subOffsetY * scale);
       // Keep subtitle panel strictly within frame
@@ -1730,7 +1749,8 @@ export default function JPVideoSubApp() {
         
         for (const tk of seg.tokens) {
           const pos = String(tk?.pos || '').toUpperCase();
-          if (pos !== 'NOUN' && pos !== 'PROPN' && pos !== 'VERB') continue;
+          // Hiển thị tất cả từ vựng từ JSON, không chỉ NOUN, PROPN, VERB
+          if (pos === 'PUNCT' || pos === 'PARTICLE' || pos === 'SYMBOL') continue;
           const surface = String(tk?.surface || '').trim();
           if (!surface || seen.has(surface)) continue;
           seen.add(surface);
@@ -1778,7 +1798,8 @@ export default function JPVideoSubApp() {
         
         for (const tk of seg.tokens) {
           const pos = String(tk?.pos || '').toUpperCase();
-          if (pos !== 'NOUN' && pos !== 'PROPN' && pos !== 'VERB') continue;
+          // Hiển thị tất cả từ vựng từ JSON, không chỉ NOUN, PROPN, VERB
+          if (pos === 'PUNCT' || pos === 'PARTICLE' || pos === 'SYMBOL') continue;
           const surface = String(tk?.surface || '').trim();
           if (!surface || seen.has(surface)) continue;
           seen.add(surface);
@@ -1922,10 +1943,6 @@ export default function JPVideoSubApp() {
       roundRect(ctx, x0, boxY, innerW + outerMargin * 2, boxH, Math.max(8, Math.round(16 * scale)));
       ctx.fill();
       
-      // Debug: Draw a simple test text
-      ctx.fillStyle = '#ff0000';
-      ctx.font = '20px Arial';
-      ctx.fillText('TEST SUBTITLE', 50, 50);
 
 
       // Draw sentences: JP tokens line (centered) then VI lines (centered)
@@ -1943,7 +1960,7 @@ export default function JPVideoSubApp() {
             x += row.tagW;
           }
           for (const b of row.boxes) {
-            const isActive = currentHighlightTiming.enabled && b.gi === activeIdx && !isPunctToken(b.tk);
+            const isActive = currentHighlightTiming.enabled && b.gi === activeIdx;
             const bg = posBg(b.tk.pos, isActive);
             if (row.anyReading && showFurigana && b.tk.reading && !isPunctToken(b.tk)) {
               ctx.font = `500 ${readingFontPxBase}px ${fontFamily}`;
@@ -2241,8 +2258,18 @@ export default function JPVideoSubApp() {
     setRecording(true);
     chunks = [];
     console.log('Starting MediaRecorder...');
+    console.log('Canvas stream debug:', {
+      active: canvasStream.active,
+      videoTracks: canvasStream.getVideoTracks().length,
+      audioTracks: canvasStream.getAudioTracks().length,
+      trackStates: canvasStream.getTracks().map(t => ({ 
+        kind: t.kind, 
+        enabled: t.enabled, 
+        readyState: t.readyState 
+      }))
+    });
     try {
-      rec.start(500);
+      rec.start(1000); // Tăng interval lên 1 giây
       console.log('MediaRecorder started successfully');
     } catch (error) {
       console.error('Failed to start MediaRecorder:', error);
@@ -2562,9 +2589,9 @@ export default function JPVideoSubApp() {
                           alignItems: 'center'
                         }}>
                           {currentSeg.tokens?.map((tk, i) => {
-                            const isHighlightable = !isPunctToken(tk);
+                            const isHighlightable = true; // Highlight tất cả
                             const isActive = i === currentTokenIndex;
-                            const active = highlightTiming.enabled && isActive && isHighlightable;
+                            const active = highlightTiming.enabled && isActive;
                             const vi = String(tk?.vi || getVocabTranslation(tk.surface) || '').trim();
                             
                             return (
@@ -2663,9 +2690,9 @@ export default function JPVideoSubApp() {
                             <div className="token-line">
                               <span className="speaker-tag">A:</span>
                               {line.map(([tk, i]) => {
-                                const isHighlightable = !isPunctToken(tk);
+                                const isHighlightable = true; // Highlight tất cả
                                 const isActive = i === currentTokenIndex;
-                                    const active = highlightTiming.enabled && isActive && isHighlightable;
+                                    const active = highlightTiming.enabled && isActive;
                                 return (
                                   <span
                                     key={i}
@@ -2745,7 +2772,7 @@ export default function JPVideoSubApp() {
                             padding: '1rem',
                             fontStyle: 'italic'
                           }}>
-                            Không có từ vựng NOUN/PROPN/VERB trong câu này
+                            Không có từ vựng trong câu này
                           </div>
                         )}
                         {vocabEntries.length > 0 && vocabEntries.every(entry => !entry.vi) && (
@@ -2959,7 +2986,29 @@ export default function JPVideoSubApp() {
             </button>
           </div>
 
+        {/* Settings Toggle Button */}
+        <div style={{ marginBottom: '1rem' }}>
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: showSettings ? '#3b82f6' : '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Settings2 className="icon-4" />
+            {showSettings ? 'Ẩn Settings' : 'Hiện Settings'}
+          </button>
+        </div>
+
         {/* Settings Row - Left Side */}
+        {showSettings && (
         <div className="controls-row" style={{ justifyContent: 'flex-start' }}>
           <div className="controls-right" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start', maxWidth: '800px' }}>
             {/* Audio Controls */}
@@ -3210,6 +3259,7 @@ export default function JPVideoSubApp() {
             </label>
           </div>
         </div>
+        )}
 
         {/* Segments list (seek) */}
         <div className="segments-panel">

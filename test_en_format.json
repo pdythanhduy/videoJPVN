@@ -1,0 +1,42 @@
+{
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 10.0,
+      "jp": "俺は火影になるまで絶対に諦めない！(Naruto)",
+      "en": "I will absolutely not give up until I become Hokage!",
+      "tokens": [
+        { "surface": "俺", "reading": "おれ", "romaji": "ore", "pos": "PRON", "t": 0.05, "en": "I", "end": 0.44 },
+        { "surface": "は", "reading": "わ", "romaji": "wa", "pos": "PARTICLE", "t": 0.44, "en": "(topic)", "end": 0.7 },
+        { "surface": "火影", "reading": "ほかげ", "romaji": "hokage", "pos": "NOUN", "t": 0.7, "en": "Hokage", "end": 1.3 },
+        { "surface": "に", "reading": "に", "romaji": "ni", "pos": "PARTICLE", "t": 1.3, "en": "to", "end": 1.52 },
+        { "surface": "なる", "reading": "なる", "romaji": "naru", "pos": "VERB", "t": 1.52, "en": "become", "end": 1.93 },
+        { "surface": "まで", "reading": "まで", "romaji": "made", "pos": "PARTICLE", "t": 1.93, "en": "until", "end": 2.24 },
+        { "surface": "絶対", "reading": "ぜったい", "romaji": "zettai", "pos": "NOUN", "t": 2.24, "en": "absolutely", "end": 3.03 },
+        { "surface": "に", "reading": "に", "romaji": "ni", "pos": "PARTICLE", "t": 3.03, "en": "(adverb)", "end": 3.44 },
+        { "surface": "諦めない", "reading": "あきらめない", "romaji": "akirame nai", "pos": "VERB", "t": 3.44, "en": "not give up", "end": 4.64 },
+        { "surface": "！", "reading": "！", "romaji": "", "pos": "PUNCT", "t": 4.64, "en": "!", "end": 10.0 }
+      ]
+    },
+    {
+      "start": 10.0,
+      "end": 16.0,
+      "jp": "仲間を大切にしないやつは、それ以上のクズだ.",
+      "en": "Those who don't cherish their comrades are worse than trash.",
+      "tokens": [
+        { "surface": "仲間", "reading": "なかま", "romaji": "nakama", "pos": "NOUN", "t": 0.05, "en": "comrades", "end": 0.5 },
+        { "surface": "を", "reading": "を", "romaji": "o", "pos": "PARTICLE", "t": 0.5, "en": "(object)", "end": 0.65 },
+        { "surface": "大切にしない", "reading": "たいせつにしない", "romaji": "taisetsu ni shinai", "pos": "VERB", "t": 0.65, "en": "not cherish", "end": 1.8 },
+        { "surface": "やつ", "reading": "やつ", "romaji": "yatsu", "pos": "NOUN", "t": 1.8, "en": "one who", "end": 2.1 },
+        { "surface": "は", "reading": "は", "romaji": "wa", "pos": "PARTICLE", "t": 2.1, "en": "is", "end": 2.25 },
+        { "surface": "、", "reading": "、", "romaji": "", "pos": "PUNCT", "t": 2.25, "en": ",", "end": 2.4 },
+        { "surface": "それ", "reading": "それ", "romaji": "sore", "pos": "PRON", "t": 2.4, "en": "that", "end": 2.65 },
+        { "surface": "以上", "reading": "いじょう", "romaji": "ijou", "pos": "NOUN", "t": 2.65, "en": "more than", "end": 3.1 },
+        { "surface": "の", "reading": "の", "romaji": "no", "pos": "PARTICLE", "t": 3.1, "en": "of", "end": 3.25 },
+        { "surface": "クズ", "reading": "クズ", "romaji": "kuzu", "pos": "NOUN", "t": 3.25, "en": "trash", "end": 3.7 },
+        { "surface": "だ", "reading": "だ", "romaji": "da", "pos": "AUX", "t": 3.7, "en": "is", "end": 3.85 },
+        { "surface": ".", "reading": ".", "romaji": "", "pos": "PUNCT", "t": 3.85, "en": ".", "end": 16.0 }
+      ]
+    }
+  ]
+}

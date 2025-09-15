@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segment Progression Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-case { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 3px; }
+        button { margin: 5px; padding: 10px 15px; }
+        .segment { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 3px; }
+        .current { background: #e3f2fd; border-color: #2196f3; }
+    </style>
+</head>
+<body>
+    <h1>Segment Progression Test</h1>
+    
+    <div class="test-case">
+        <h3>Test Case: JSON Segment Progression</h3>
+        <button onclick="testSegmentProgression()">Test Segment Progression</button>
+        <div id="result" class="result"></div>
+    </div>
+
+    <div class="test-case">
+        <h3>Current Segments:</h3>
+        <div id="segments"></div>
+    </div>
+
+    <script>
+        // Test data
+        const testData = {
+            segments: [
+                { start: 0, end: 5, jp: "こんにちは", vi: "Xin chào" },
+                { start: 5, end: 10, jp: "元気ですか", vi: "Bạn có khỏe không?" },
+                { start: 10, end: 15, jp: "今日は天気がいいですね", vi: "Hôm nay thời tiết đẹp nhỉ" },
+                { start: 15, end: 20, jp: "ありがとうございます", vi: "Cảm ơn bạn" }
+            ]
+        };
+
+        let currentTime = 0;
+        let currentSegIndex = -1;
+        let isPlaying = false;
+        let animationId = 0;
+
+        function findCurrentSegment(time) {
+            return testData.segments.findIndex((s) => time >= s.start && time <= s.end);
+        }
+
+        function updateSegments() {
+            const segmentsDiv = document.getElementById('segments');
+            segmentsDiv.innerHTML = '';
+            
+            testData.segments.forEach((seg, index) => {
+                const div = document.createElement('div');
+                div.className = `segment ${index === currentSegIndex ? 'current' : ''}`;
+                div.innerHTML = `
+                    <strong>Segment ${index}:</strong> ${seg.start}s - ${seg.end}s<br>
+                    <strong>JP:</strong> ${seg.jp}<br>
+                    <strong>VI:</strong> ${seg.vi}
+                `;
+                segmentsDiv.appendChild(div);
+            });
+        }
+
+        function testSegmentProgression() {
+            currentTime = 0;
+            currentSegIndex = -1;
+            isPlaying = true;
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<strong>Testing segment progression...</strong><br>';
+            
+            function step() {
+                if (!isPlaying) return;
+                
+                currentTime += 0.1; // Simulate time progression
+                const newSegIndex = findCurrentSegment(currentTime);
+                
+                if (newSegIndex !== currentSegIndex) {
+                    currentSegIndex = newSegIndex;
+                    resultDiv.innerHTML += `Time: ${currentTime.toFixed(1)}s -> Segment ${currentSegIndex}<br>`;
+                    updateSegments();
+                }
+                
+                if (currentTime >= 25) { // Stop after 25 seconds
+                    isPlaying = false;
+                    resultDiv.innerHTML += '<br><strong>Test completed!</strong>';
+                    return;
+                }
+                
+                animationId = requestAnimationFrame(step);
+            }
+            
+            animationId = requestAnimationFrame(step);
+        }
+
+        // Initialize
+        updateSegments();
+    </script>
+</body>
+</html>
