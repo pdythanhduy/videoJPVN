@@ -31,8 +31,9 @@ import TrendsToolSimple from './components/TrendsToolSimple';
  *       "end": 3.20,              // giây
  *       "jp": "日本語を勉強しています。",
  *       "vi": "Tôi đang học tiếng Nhật.",
+ *       "en": "I am studying Japanese.",
  *       "tokens": [               // từng token có thời điểm tương đối trong segment
- *         { "surface": "日本語", "reading": "にほんご", "romaji": "nihongo", "pos": "NOUN", "t": 0.20 },
+ *         { "surface": "日本語", "reading": "にほんご", "romaji": "nihongo", "pos": "NOUN", "vi": "tiếng Nhật", "en": "Japanese", "t": 0.20 },
  *         { "surface": "を",     "reading": "を",       "romaji": "o",       "pos": "PARTICLE", "t": 0.60 },
  *         { "surface": "勉強",   "reading": "べんきょう", "romaji": "benkyou", "pos": "NOUN", "t": 1.00 },
  *         { "surface": "して",   "reading": "して",     "romaji": "shite",   "pos": "VERB", "t": 1.50 },
@@ -246,6 +247,7 @@ export default function JPVideoSubApp() {
   const [showFurigana, setShowFurigana] = useState(true);
   const [showRomaji, setShowRomaji] = useState(false);
   const [showVietnamese, setShowVietnamese] = useState(true);
+  const [languageMode, setLanguageMode] = useState('vi'); // 'vi' or 'en'
   const [posColors, setPosColors] = useState({ ...DEFAULT_POS_COLORS });
   const [tokenByTokenMode, setTokenByTokenMode] = useState(false);
   const [rate, setRate] = useState(1);
@@ -1219,8 +1221,8 @@ export default function JPVideoSubApp() {
           const pos = String(tk?.pos || '').toUpperCase();
           // Use highlight mode settings to determine which POS to include
           const shouldInclude = highlightMode === 'A' 
-            ? (pos !== 'PUNCT' && pos !== 'PARTICLE' && pos !== 'SYMBOL')
-            : (pos !== 'PUNCT' && pos !== 'PARTICLE' && pos !== 'SYMBOL');
+            ? (pos === 'NOUN' || pos === 'VERB' || pos === 'ADJ' || pos === 'ADV')
+            : (pos === 'NOUN' || pos === 'VERB' || pos === 'ADJ' || pos === 'ADV');
           
           if (!shouldInclude) continue;
           const surface = String(tk?.surface || '').trim();
@@ -1451,7 +1453,7 @@ export default function JPVideoSubApp() {
     const scale = width / displayW; // scale UI px -> video native px
     const bgAlpha = opacity;
     const fontFamily = 'system-ui, -apple-system, Segoe UI, Roboto, Arial';
-    const padX = Math.round(12 * scale), padY = Math.round(10 * scale);
+    const padX = Math.round(8 * scale), padY = Math.round(10 * scale);
     const tokenGap = Math.round(4 * scale);
     const lineGap = Math.round(6 * scale);
     const cornerRadius = Math.round(10 * scale);
@@ -1611,6 +1613,7 @@ export default function JPVideoSubApp() {
         }
       } else {
         console.log('Drawing segment:', actualSegIdx, 'jp:', seg.jp, 'vi:', seg.vi, 'tokens:', seg.tokens?.length);
+        console.log('Tokens:', seg.tokens?.map(t => t.surface).join('|'));
       }
 
       // Layout area
@@ -1744,36 +1747,48 @@ export default function JPVideoSubApp() {
       
       // Reserve space for vocabulary panel if in Mode B
       if (highlightMode === 'B' && seg.tokens && seg.tokens.length > 0) {
+        console.log('Processing segment tokens for vocab:', {
+          segmentIndex: actualSegIdx,
+          tokensCount: seg.tokens?.length || 0,
+          tokens: seg.tokens?.map(t => ({ surface: t.surface, pos: t.pos, vi: t.vi })) || []
+        });
+        
         const vocabEntries = [];
         const seen = new Set();
         
         for (const tk of seg.tokens) {
           const pos = String(tk?.pos || '').toUpperCase();
           // Hiển thị tất cả từ vựng từ JSON, không chỉ NOUN, PROPN, VERB
-          if (pos === 'PUNCT' || pos === 'PARTICLE' || pos === 'SYMBOL') continue;
+          if (pos !== 'NOUN' && pos !== 'VERB' && pos !== 'ADJ' && pos !== 'ADV') continue;
           const surface = String(tk?.surface || '').trim();
           if (!surface || seen.has(surface)) continue;
           seen.add(surface);
           
           const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
-          if (vi) {
-            vocabEntries.push({
-              surface,
-              reading: String(tk?.reading || '').trim(),
-              vi,
-              pos
-            });
-          }
+          const en = String(tk?.en || '').trim();
+          // Hiển thị tất cả từ vựng, kể cả khi không có nghĩa tiếng Việt
+          vocabEntries.push({
+            surface,
+            reading: String(tk?.reading || '').trim(),
+            vi: vi || surface, // Nếu không có vi thì dùng surface
+            en: en || surface, // Nếu không có en thì dùng surface
+            pos
+          });
         }
+        
+        console.log('Video recording vocab debug:', {
+          vocabEntriesCount: vocabEntries.length,
+          vocabEntries: vocabEntries.map(v => ({ surface: v.surface, pos: v.pos, vi: v.vi }))
+        });
         
         if (vocabEntries.length > 0) {
           // Calculate required space for vocabulary
           const itemWidth = Math.round(120 * scale);
           const itemHeight = Math.round(80 * scale);
-          const itemsPerRow = Math.floor((innerW + outerMargin * 2 - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+          const itemsPerRow = Math.floor((innerW + outerMargin * 2 - Math.round(32 * scale)) / (itemWidth + Math.round(8 * scale)));
           const rows = Math.ceil(vocabEntries.length / itemsPerRow);
           const vocabPanelHeight = Math.max(
-            Math.round(60 * scale) + (rows * (itemHeight + Math.round(12 * scale))),
+            Math.round(60 * scale) + (rows * (itemHeight + Math.round(8 * scale))),
             Math.round(100 * scale)
           );
           
@@ -1799,20 +1814,21 @@ export default function JPVideoSubApp() {
         for (const tk of seg.tokens) {
           const pos = String(tk?.pos || '').toUpperCase();
           // Hiển thị tất cả từ vựng từ JSON, không chỉ NOUN, PROPN, VERB
-          if (pos === 'PUNCT' || pos === 'PARTICLE' || pos === 'SYMBOL') continue;
+          if (pos !== 'NOUN' && pos !== 'VERB' && pos !== 'ADJ' && pos !== 'ADV') continue;
           const surface = String(tk?.surface || '').trim();
           if (!surface || seen.has(surface)) continue;
           seen.add(surface);
           
           const vi = String(tk?.vi || getVocabTranslation(surface) || '').trim();
-          if (vi) {
-            vocabEntries.push({
-              surface,
-              reading: String(tk?.reading || '').trim(),
-              vi,
-              pos
-            });
-          }
+          const en = String(tk?.en || '').trim();
+          // Hiển thị tất cả từ vựng, kể cả khi không có nghĩa tiếng Việt
+          vocabEntries.push({
+            surface,
+            reading: String(tk?.reading || '').trim(),
+            vi: vi || surface, // Nếu không có vi thì dùng surface
+            en: en || surface, // Nếu không có en thì dùng surface
+            pos
+          });
         }
         
         if (vocabEntries.length > 0) {
@@ -1822,7 +1838,7 @@ export default function JPVideoSubApp() {
           // Calculate vocabulary panel height for horizontal grid - full width
           const itemWidth = Math.round(120 * scale);
           const itemHeight = Math.round(80 * scale);
-          const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+          const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(8 * scale)));
           const rows = Math.ceil(vocabEntries.length / itemsPerRow);
           
           // Calculate actual content height needed for each vocabulary item
@@ -1844,7 +1860,7 @@ export default function JPVideoSubApp() {
             const viLines = Math.ceil(viText.length / 18); // More characters per line
             
             const totalLines = Math.max(1, jpLines) + Math.max(1, readingLines) + Math.max(1, viLines);
-            const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(12 * scale)) + Math.round(6 * scale); // Reduced padding and line height
+            const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(8 * scale)) + Math.round(6 * scale); // Reduced padding and line height
             
             maxItemHeight = Math.max(maxItemHeight, estimatedHeight);
           });
@@ -2013,7 +2029,7 @@ export default function JPVideoSubApp() {
         // Calculate vocabulary items layout
         const itemWidth = Math.round(120 * scale);
         const itemHeight = Math.round(80 * scale);
-        const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(12 * scale)));
+        const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(8 * scale)));
         const rows = Math.ceil(vocabEntries.length / itemsPerRow);
         
         // Calculate dynamic item height based on content length - compact version
@@ -2029,7 +2045,7 @@ export default function JPVideoSubApp() {
           const viLines = Math.ceil(viText.length / 18);
           
           const totalLines = Math.max(1, jpLines) + Math.max(1, readingLines) + Math.max(1, viLines);
-          const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(12 * scale)) + Math.round(6 * scale);
+          const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(14 * scale)) + Math.round(6 * scale);
           
           maxItemHeight = Math.max(maxItemHeight, estimatedHeight);
         });
@@ -2043,7 +2059,7 @@ export default function JPVideoSubApp() {
         
         // Panel background with margin and padding
         const margin = Math.round(8 * scale); // Margin around vocabulary content
-        const bottomPadding = Math.round(12 * scale);
+        const bottomPadding = Math.round(8 * scale);
         const backgroundHeight = vocabPanelHeight + bottomPadding + (margin * 2);
         const backgroundY = vocabPanelY - margin;
         
@@ -2091,8 +2107,8 @@ export default function JPVideoSubApp() {
         vocabEntries.forEach((entry, idx) => {
           const row = Math.floor(idx / itemsPerRow);
           const col = idx % itemsPerRow;
-          const x = startX + col * (itemWidth + Math.round(12 * scale));
-          const y = startY + row * (maxItemHeight + Math.round(12 * scale));
+          const x = startX + col * (itemWidth + Math.round(8 * scale));
+          const y = startY + row * (maxItemHeight + Math.round(8 * scale));
           
           // Check if item would be outside the allocated vocabulary panel area
           const vocabPanelBottom = vocabPanelY + vocabPanelHeight;
@@ -2116,32 +2132,34 @@ export default function JPVideoSubApp() {
           
           // Item background
           ctx.fillStyle = 'rgba(59,130,246,0.15)';
-          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(12 * scale)));
+          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(8 * scale)));
           ctx.fill();
           
           // Item border
           ctx.strokeStyle = 'rgba(59,130,246,0.5)';
           ctx.lineWidth = Math.max(2, Math.round(2 * scale));
-          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(12 * scale)));
+          roundRect(ctx, x, y, itemWidth, maxItemHeight, Math.max(8, Math.round(8 * scale)));
           ctx.stroke();
           
           // Calculate text positions based on dynamic height with proper wrapping - compact
           const textStartY = y + Math.round(15 * scale);
-          const lineHeight = Math.round(12 * scale);
-          const itemPadding = Math.round(12 * scale);
+          const lineHeight = Math.round(14 * scale);
+          const itemPadding = Math.round(8 * scale);
           const availableWidth = itemWidth - (itemPadding * 2);
           
           let currentY = textStartY;
           
           // Japanese text - compact size with wrapping
           ctx.textAlign = 'center';
-          ctx.font = `700 ${Math.max(14 * scale, subFontSize * scale * 0.8)}px ${fontFamily}`;
+          ctx.font = `700 ${Math.max(16 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
           ctx.fillStyle = '#ffffff';
           
-          // Wrap Japanese text if too long
+          // Wrap Japanese text based on actual width
           const jpText = entry.surface || '';
-          if (jpText.length > 8) {
-            // Split long text into multiple lines
+          const jpMetrics = ctx.measureText(jpText);
+          
+          if (jpMetrics.width > availableWidth) {
+            // Split long text into multiple lines based on actual width
             const words = jpText.split('');
             let line = '';
             let lines = [];
@@ -2168,14 +2186,19 @@ export default function JPVideoSubApp() {
             currentY += lineHeight;
           }
           
+          // Add spacing between Japanese and Reading
+          currentY += Math.round(4 * scale);
+          
           // Reading - compact size with wrapping
           if (entry.reading) {
-            ctx.font = `500 ${Math.max(10 * scale, subFontSize * scale * 0.6)}px ${fontFamily}`;
+            ctx.font = `500 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
             ctx.fillStyle = '#e4e4e7';
             
             const readingText = entry.reading;
-            if (readingText.length > 12) {
-              // Split long reading text
+            const readingMetrics = ctx.measureText(readingText);
+            
+            if (readingMetrics.width > availableWidth) {
+              // Split long reading text based on actual width
               const words = readingText.split('');
               let line = '';
               let lines = [];
@@ -2202,14 +2225,19 @@ export default function JPVideoSubApp() {
             }
           }
           
-          // Vietnamese meaning - compact size with wrapping
-          ctx.font = `600 ${Math.max(12 * scale, subFontSize * scale * 0.7)}px ${fontFamily}`;
+          // Add spacing between Reading and Vietnamese
+          currentY += Math.round(4 * scale);
+          
+          // Translation meaning - compact size with wrapping
+          ctx.font = `600 ${Math.max(14 * scale, subFontSize * scale * 0.8)}px ${fontFamily}`;
           ctx.fillStyle = '#10b981';
           
-          const viText = entry.vi || '';
-          if (viText.length > 15) {
-            // Split long Vietnamese text
-            const words = viText.split(' ');
+          const translationText = languageMode === 'vi' ? (entry.vi || '') : (entry.en || '');
+          const translationMetrics = ctx.measureText(translationText);
+          
+          if (translationMetrics.width > availableWidth) {
+            // Split long translation text based on actual width
+            const words = translationText.split(' ');
             let line = '';
             let lines = [];
             
@@ -2229,7 +2257,7 @@ export default function JPVideoSubApp() {
               ctx.fillText(line, x + itemWidth / 2, currentY + (idx * lineHeight));
             });
           } else {
-            ctx.fillText(viText, x + itemWidth / 2, currentY);
+            ctx.fillText(translationText, x + itemWidth / 2, currentY);
           }
         });
         
@@ -2588,6 +2616,7 @@ export default function JPVideoSubApp() {
                           justifyContent: 'center',
                           alignItems: 'center'
                         }}>
+                          {console.log('UI Tokens:', currentSeg.tokens?.map(t => `${t.surface}(${t.pos})`).join('|')) || ''}
                           {currentSeg.tokens?.map((tk, i) => {
                             const isHighlightable = true; // Highlight tất cả
                             const isActive = i === currentTokenIndex;
@@ -2633,6 +2662,17 @@ export default function JPVideoSubApp() {
                                   </div>
                                 )}
                                 
+                                {/* Romaji - hiển thị ngay dưới hiragana */}
+                                {showRomaji && (tk.romaji || tk.reading) && (
+                                  <div style={{ 
+                                    fontSize: '0.7rem', 
+                                    color: '#9ca3af',
+                                    marginBottom: '0.25rem'
+                                  }}>
+                                    {tk.romaji || tk.reading}
+                                  </div>
+                                )}
+                                
                                 {/* Vietnamese meaning */}
                                 {vi && (
                                   <div style={{ 
@@ -2649,24 +2689,13 @@ export default function JPVideoSubApp() {
                                     {vi}
                                   </div>
                                 )}
-                                
-                                {/* Romaji */}
-                                {showRomaji && tk.romaji && (
-                                  <div style={{ 
-                                    fontSize: '0.7rem', 
-                                    color: '#6b7280',
-                                    marginTop: '0.25rem'
-                                  }}>
-                                    {tk.romaji}
-                                  </div>
-                                )}
                               </div>
                             );
                           })}
                         </div>
                         
-                        {/* Vietnamese translation */}
-                        {showVietnamese && currentSeg.vi && (
+                        {/* Translation */}
+                        {showVietnamese && ((languageMode === 'vi' && currentSeg.vi) || (languageMode === 'en' && currentSeg.en)) && (
                           <div style={{ 
                             marginTop: '1rem', 
                             fontSize: '1rem', 
@@ -2674,7 +2703,7 @@ export default function JPVideoSubApp() {
                             textAlign: 'center',
                             fontStyle: 'italic'
                           }}>
-                            {currentSeg.vi}
+                            {languageMode === 'vi' ? currentSeg.vi : currentSeg.en}
                           </div>
                         )}
                       </div>
@@ -2946,8 +2975,28 @@ export default function JPVideoSubApp() {
           border: '1px solid rgba(63,63,70,0.3)',
           marginBottom: '1rem',
           flexWrap: 'wrap',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          alignItems: 'center'
         }}>
+            {/* Highlight Toggle */}
+            <label className="check-label" style={{ marginRight: '1rem' }}>
+              <input 
+                type="checkbox" 
+                checked={highlightMode === 'A' ? highlightEnabled : highlightModeBEnabled} 
+                onChange={(e) => {
+                  if (highlightMode === 'A') {
+                    setHighlightEnabled(e.target.checked);
+                  } else {
+                    setHighlightModeBEnabled(e.target.checked);
+                  }
+                }} 
+              />
+              <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <Highlighter className="icon-4" />
+                Highlight {highlightMode === 'A' ? 'A' : 'B'}
+              </span>
+            </label>
+            
             <button onClick={handlePlayPause} className="btn">
               {playing ? <Pause className="icon-4" /> : <Play className="icon-4" />}
               <span>{playing ? 'Pause' : 'Play'}</span>
@@ -3249,6 +3298,19 @@ export default function JPVideoSubApp() {
               <input type="checkbox" checked={showVietnamese} onChange={(e) => setShowVietnamese(e.target.checked)} />
               <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Wand2 className="icon-4" /> Tiếng Việt</span>
             </label>
+            <div className="control-group">
+              <span className="btn-label">Ngôn ngữ hiển thị</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <label className="check-label">
+                  <input type="radio" name="languageMode" value="vi" checked={languageMode === 'vi'} onChange={(e) => setLanguageMode(e.target.value)} />
+                  <span className="btn-label">Tiếng Việt</span>
+                </label>
+                <label className="check-label">
+                  <input type="radio" name="languageMode" value="en" checked={languageMode === 'en'} onChange={(e) => setLanguageMode(e.target.value)} />
+                  <span className="btn-label">English</span>
+                </label>
+              </div>
+            </div>
             <label className="check-label">
               <input type="checkbox" checked={subCentered} onChange={(e) => setSubCentered(e.target.checked)} />
               <span className="btn-label">Sub giữa màn hình</span>
