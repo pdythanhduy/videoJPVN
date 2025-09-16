@@ -1,0 +1,3 @@
+[33mf5396db[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mclean-version[m[33m)[m Fix video recording and highlight features
+[33m8be6163[m fix: improve vocabulary panel layout and rendering in JPVideoSubApp, including dynamic height calculations, overflow handling, and enhanced text wrapping for better display of vocabulary items
+[33mb6e853c[m feat: add AI Video Tool and Video Review features, including fixes guide, auto-buy script for Apple Store, and encoding improvements
