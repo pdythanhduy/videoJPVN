@@ -1,0 +1,53 @@
+{
+  "duration": 15.5,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 8.72,
+      "jp": "ある大学の寮で、不思議な出来事がよく起こると言われています。夜になると、廊下から足音が聞こえてきます。",
+      "vi": "Người ta nói rằng trong ký túc xá của một trường đại học thường xảy ra những chuyện kỳ lạ. Vào ban đêm, từ hành lang vang lên tiếng bước chân.",
+      "en": "It is said that strange events often occur in a university dormitory. At night, footsteps can be heard from the hallway.",
+      "tokens": [
+        {
+          "surface": "ある",
+          "reading": "ある",
+          "romaji": "aru",
+          "pos": "ADNOM",
+          "t": 0.05,
+          "vi": "một",
+          "en": "a",
+          "end": 0.36
+        },
+        {
+          "surface": "大学",
+          "reading": "だいがく",
+          "romaji": "daigaku",
+          "pos": "NOUN",
+          "t": 0.36,
+          "vi": "đại học",
+          "en": "university",
+          "end": 0.88
+        }
+      ]
+    },
+    {
+      "start": 8.72,
+      "end": 15.5,
+      "jp": "学生たちは、その音を聞いても、誰もいないはずの廊下に足音がするのは不思議だと思っています。",
+      "vi": "Các sinh viên, dù nghe thấy tiếng đó, vẫn nghĩ rằng thật kỳ lạ khi có tiếng bước chân ở hành lang mà lẽ ra không có ai.",
+      "en": "The students, even when they hear the sound, think it's strange that there are footsteps in the hallway where no one should be.",
+      "tokens": [
+        {
+          "surface": "学生",
+          "reading": "がくせい",
+          "romaji": "gakusei",
+          "pos": "NOUN",
+          "t": 8.72,
+          "vi": "sinh viên",
+          "en": "students",
+          "end": 9.2
+        }
+      ]
+    }
+  ]
+}

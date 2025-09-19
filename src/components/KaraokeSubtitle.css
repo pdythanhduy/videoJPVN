@@ -1,0 +1,172 @@
+/* Karaoke Subtitle Styles */
+.karaoke-subtitle-container {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.karaoke-subtitle-content {
+  padding: 1.5rem;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Token highlighting animation */
+.karaoke-token {
+  display: inline-block;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 0.125rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.karaoke-token.active {
+  background: linear-gradient(45deg, #fbbf24, #f59e0b);
+  color: #1f2937;
+  font-weight: 700;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.karaoke-token.next {
+  color: #e5e7eb;
+  opacity: 0.8;
+}
+
+.karaoke-token.previous {
+  color: #9ca3af;
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+/* Segment styling */
+.karaoke-segment {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.karaoke-segment.current {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2);
+}
+
+.karaoke-segment.next {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.karaoke-segment.previous {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.05);
+  opacity: 0.6;
+}
+
+/* Japanese text styling */
+.karaoke-japanese {
+  font-size: 1.25rem;
+  line-height: 1.6;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+/* Vietnamese text styling */
+.karaoke-vietnamese {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: #d1d5db;
+  text-align: center;
+  font-style: italic;
+}
+
+/* Smooth scrolling container */
+.karaoke-scroll-container {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+/* Fade effects */
+.karaoke-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.karaoke-fade-out {
+  animation: fadeOut 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .karaoke-subtitle-container {
+    margin: 0.5rem;
+    border-radius: 0.5rem;
+  }
+  
+  .karaoke-subtitle-content {
+    padding: 1rem;
+  }
+  
+  .karaoke-japanese {
+    font-size: 1.125rem;
+  }
+  
+  .karaoke-vietnamese {
+    font-size: 0.8rem;
+  }
+}
+
+/* Dark theme enhancements */
+.karaoke-subtitle-container.dark {
+  background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* High contrast mode */
+.karaoke-subtitle-container.high-contrast .karaoke-token.active {
+  background: #ffff00;
+  color: #000000;
+  font-weight: 900;
+}
+
+/* Accessibility improvements */
+.karaoke-subtitle-container:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Smooth transitions for all interactive elements */
+.karaoke-subtitle-container * {
+  transition: all 0.2s ease-in-out;
+}

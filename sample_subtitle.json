@@ -1,0 +1,246 @@
+{
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 8.72,
+      "jp": "ある大学の寮で、不思議な出来事がよく起こると言われています。夜になると、廊下から足音が聞こえてきます。",
+      "vi": "Người ta nói rằng trong ký túc xá của một trường đại học thường xảy ra những chuyện kỳ lạ. Vào ban đêm, từ hành lang vang lên tiếng bước chân.",
+      "tokens": [
+        {
+          "surface": "ある",
+          "reading": "ある",
+          "romaji": "aru",
+          "pos": "ADNOM",
+          "t": 0.05,
+          "vi": "một",
+          "end": 0.36
+        },
+        {
+          "surface": "大学",
+          "reading": "だいがく",
+          "romaji": "daigaku",
+          "pos": "NOUN",
+          "t": 0.36,
+          "vi": "đại học",
+          "end": 0.88
+        },
+        {
+          "surface": "の",
+          "reading": "の",
+          "romaji": "no",
+          "pos": "PARTICLE",
+          "t": 0.88,
+          "vi": "của",
+          "end": 1.01
+        },
+        {
+          "surface": "寮",
+          "reading": "りょう",
+          "romaji": "ryō",
+          "pos": "NOUN",
+          "t": 1.01,
+          "vi": "ký túc xá",
+          "end": 1.28
+        },
+        {
+          "surface": "で",
+          "reading": "で",
+          "romaji": "de",
+          "pos": "PARTICLE",
+          "t": 1.28,
+          "vi": "ở",
+          "end": 1.35
+        },
+        {
+          "surface": "、",
+          "reading": "、",
+          "romaji": "",
+          "pos": "PUNCT",
+          "t": 1.35,
+          "vi": "",
+          "end": 1.68
+        },
+        {
+          "surface": "不思議",
+          "reading": "ふしぎ",
+          "romaji": "fushigi",
+          "pos": "NOUN",
+          "t": 1.68,
+          "vi": "kỳ lạ",
+          "end": 2.08
+        },
+        {
+          "surface": "な",
+          "reading": "な",
+          "romaji": "na",
+          "pos": "AUX",
+          "t": 2.08,
+          "vi": "(tính từ)",
+          "end": 2.32
+        },
+        {
+          "surface": "出来事",
+          "reading": "できごと",
+          "romaji": "dekigoto",
+          "pos": "NOUN",
+          "t": 2.32,
+          "vi": "sự việc",
+          "end": 2.84
+        },
+        {
+          "surface": "が",
+          "reading": "が",
+          "romaji": "ga",
+          "pos": "PARTICLE",
+          "t": 2.84,
+          "vi": "(trợ từ)",
+          "end": 2.97
+        },
+        {
+          "surface": "よく",
+          "reading": "よく",
+          "romaji": "yoku",
+          "pos": "ADV",
+          "t": 2.97,
+          "vi": "thường",
+          "end": 3.31
+        },
+        {
+          "surface": "起こる",
+          "reading": "おこる",
+          "romaji": "okoru",
+          "pos": "VERB",
+          "t": 3.31,
+          "vi": "xảy ra",
+          "end": 3.7
+        },
+        {
+          "surface": "と",
+          "reading": "と",
+          "romaji": "to",
+          "pos": "PARTICLE",
+          "t": 3.7,
+          "vi": "là",
+          "end": 3.99
+        },
+        {
+          "surface": "言われています",
+          "reading": "いわれています",
+          "romaji": "iwa re te i masu",
+          "pos": "VERB",
+          "t": 3.99,
+          "vi": "người ta nói",
+          "end": 4.89
+        },
+        {
+          "surface": "。",
+          "reading": "。",
+          "romaji": "",
+          "pos": "PUNCT",
+          "t": 4.89,
+          "vi": "",
+          "end": 5.07
+        },
+        {
+          "surface": "夜",
+          "reading": "よる",
+          "romaji": "yoru",
+          "pos": "NOUN",
+          "t": 5.07,
+          "vi": "đêm",
+          "end": 5.34
+        },
+        {
+          "surface": "に",
+          "reading": "に",
+          "romaji": "ni",
+          "pos": "PARTICLE",
+          "t": 5.34,
+          "vi": "",
+          "end": 5.48
+        },
+        {
+          "surface": "なる",
+          "reading": "なる",
+          "romaji": "naru",
+          "pos": "VERB",
+          "t": 5.48,
+          "vi": "đến",
+          "end": 5.74
+        },
+        {
+          "surface": "と",
+          "reading": "と",
+          "romaji": "to",
+          "pos": "PARTICLE",
+          "t": 5.74,
+          "vi": "khi",
+          "end": 5.82
+        },
+        {
+          "surface": "、",
+          "reading": "、",
+          "romaji": "",
+          "pos": "PUNCT",
+          "t": 5.82,
+          "vi": "",
+          "end": 6.14
+        },
+        {
+          "surface": "廊下",
+          "reading": "ろうか",
+          "romaji": "rōka",
+          "pos": "NOUN",
+          "t": 6.14,
+          "vi": "hành lang",
+          "end": 6.53
+        },
+        {
+          "surface": "から",
+          "reading": "から",
+          "romaji": "kara",
+          "pos": "PARTICLE",
+          "t": 6.53,
+          "vi": "từ",
+          "end": 6.73
+        },
+        {
+          "surface": "足音",
+          "reading": "あしおと",
+          "romaji": "ashioto",
+          "pos": "NOUN",
+          "t": 6.73,
+          "vi": "tiếng bước chân",
+          "end": 7.24
+        },
+        {
+          "surface": "が",
+          "reading": "が",
+          "romaji": "ga",
+          "pos": "PARTICLE",
+          "t": 7.24,
+          "vi": "(trợ từ)",
+          "end": 7.53
+        },
+        {
+          "surface": "聞こえてきます",
+          "reading": "きこえてきます",
+          "romaji": "kikoe te ki masu",
+          "pos": "VERB",
+          "t": 7.53,
+          "vi": "nghe thấy",
+          "end": 8.43
+        },
+        {
+          "surface": "。",
+          "reading": "。",
+          "romaji": "",
+          "pos": "PUNCT",
+          "t": 8.43,
+          "vi": "",
+          "end": 8.72
+        }
+      ]
+    }
+  ]
+}

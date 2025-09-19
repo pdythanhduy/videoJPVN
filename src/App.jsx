@@ -13,6 +13,8 @@ import YouTubeDownloader from './components/YouTubeDownloader';
 import STTConverter from './components/STTConverter';
 import YouTubeTester from './components/YouTubeTester';
 import TrendsToolSimple from './components/TrendsToolSimple';
+import KaraokePage from './pages/KaraokePage';
+import VideoSubtitlePage from './pages/VideoSubtitlePage';
 
 // =============================================================
 // JP–VI Video Sub App (React) – Furigana + POS Highlight
@@ -45,6 +47,12 @@ import TrendsToolSimple from './components/TrendsToolSimple';
  *   ]
  * }
  */
+
+// Video size definitions
+const VIDEO_SIZES = {
+  youtube: { width: 1920, height: 1080, name: 'YouTube (16:9)', aspectRatio: 16/9 },
+  tiktok: { width: 1080, height: 1920, name: 'TikTok (9:16)', aspectRatio: 9/16 }
+};
 
 // Bảng màu cho loại từ (có thể chỉnh trong UI)
 const DEFAULT_POS_COLORS = {
@@ -234,6 +242,131 @@ function secondsToTimestamp(s) {
 export default function JPVideoSubApp() {
   const videoRef = useRef(null);
   const wrapperRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const recordedChunksRef = useRef([]);
+  const [vocabLayout, setVocabLayout] = useState('full'); // 'full' | 'grid'
+  
+  async function exportVocabPng() {
+    try {
+      const root = wrapperRef.current || document.body;
+      const panel = root.querySelector('.vocab-panel');
+      if (!panel) return alert('Không tìm thấy panel từ vựng để chụp ảnh');
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(panel, { backgroundColor: null, useCORS: true, scale: 2 });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url; a.download = `vocab_${Date.now()}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (err) {
+      console.error('Export PNG failed:', err);
+      alert('Không thể xuất PNG. Vui lòng dùng Chrome/Edge mới hoặc thử lại.');
+    }
+  }
+
+  async function startDomRecording() {
+    try {
+      const el = wrapperRef.current;
+      if (!el) return alert('Không tìm thấy khung hiển thị');
+
+      // Capture video of the wrapper
+      const fps = 30;
+      const displayStream = el.captureStream ? el.captureStream(fps) : (el.mozCaptureStream ? el.mozCaptureStream(fps) : null);
+      if (!displayStream) return alert('Trình duyệt không hỗ trợ captureStream');
+
+      // Try to add audio track from main audio/video if present
+      const mixedStream = new MediaStream();
+      displayStream.getVideoTracks().forEach(t => mixedStream.addTrack(t));
+
+      // Prefer audio from audioMainRef if available
+      const audioEl = audioMainRef?.current;
+      const videoEl = videoRef?.current;
+      if (audioEl?.captureStream) {
+        const aStream = audioEl.captureStream();
+        const aTrack = aStream.getAudioTracks()[0];
+        if (aTrack) mixedStream.addTrack(aTrack);
+      } else if (videoEl?.captureStream) {
+        const vStream = videoEl.captureStream();
+        const aTrack = vStream.getAudioTracks()[0];
+        if (aTrack) mixedStream.addTrack(aTrack);
+      }
+
+      const mimeCandidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ];
+      let mimeType = '';
+      for (const m of mimeCandidates) { if (MediaRecorder.isTypeSupported(m)) { mimeType = m; break; } }
+      const mr = new MediaRecorder(mixedStream, mimeType ? { mimeType } : {});
+      recordedChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `export_${Date.now()}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setIsRecording(false);
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Start recording failed:', err);
+      alert('Không thể bắt đầu ghi hình');
+    }
+  }
+
+  function stopDomRecording() {
+    try {
+      const mr = mediaRecorderRef.current;
+      if (mr && mr.state !== 'inactive') mr.stop();
+    } catch {}
+  }
+
+  async function startScreenRecording() {
+    try {
+      const constraints = {
+        video: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 48000
+        }
+      };
+      const stream = await (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia ? navigator.mediaDevices.getDisplayMedia(constraints) : Promise.reject('Không hỗ trợ getDisplayMedia'));
+      const mimeCandidates = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm'
+      ];
+      let mimeType = '';
+      for (const m of mimeCandidates) { if (MediaRecorder.isTypeSupported(m)) { mimeType = m; break; } }
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      recordedChunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType || 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `screen_${Date.now()}.webm`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setIsRecording(false);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setIsRecording(true);
+      // Auto-stop when user stops sharing
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => { try { if (mr.state !== 'inactive') mr.stop(); } catch {} });
+    } catch (err) {
+      console.error('Start screen recording failed:', err);
+      alert('Không thể bắt đầu ghi màn hình. Vui lòng cấp quyền hoặc dùng Chrome/Edge mới.');
+    }
+  }
   const [data, setData] = useState(() => normalizeData(DEMO_DATA));
   const [videoURL, setVideoURL] = useState(null);
   const [imageURL, setImageURL] = useState(null);
@@ -248,6 +381,7 @@ export default function JPVideoSubApp() {
   const [showRomaji, setShowRomaji] = useState(false);
   const [showVietnamese, setShowVietnamese] = useState(true);
   const [languageMode, setLanguageMode] = useState('vi'); // 'vi' or 'en'
+  const [videoSize, setVideoSize] = useState('youtube'); // 'youtube' or 'tiktok'
   const [posColors, setPosColors] = useState({ ...DEFAULT_POS_COLORS });
   const [tokenByTokenMode, setTokenByTokenMode] = useState(false);
   const [rate, setRate] = useState(1);
@@ -299,6 +433,8 @@ export default function JPVideoSubApp() {
   const [sttOpen, setSttOpen] = useState(false);
   const [youtubeTestOpen, setYoutubeTestOpen] = useState(false);
   const [trendsOpen, setTrendsOpen] = useState(false);
+  const [karaokeOpen, setKaraokeOpen] = useState(false);
+  const [videoSubtitleOpen, setVideoSubtitleOpen] = useState(false);
 
   // STT (Audio -> SRT)
   const [sttApiKey, setSttApiKey] = useState('');
@@ -504,6 +640,20 @@ export default function JPVideoSubApp() {
   }, [playing]);
 
   const currentSeg = currentSegIndex >= 0 ? data.segments[currentSegIndex] : null;
+  
+  // Debug log for current segment
+  console.log('Current segment debug:', {
+    currentSegIndex,
+    now,
+    simTime,
+    dataLength: data?.segments?.length,
+    currentSeg: currentSeg ? {
+      jp: currentSeg.jp,
+      vi: currentSeg.vi,
+      start: currentSeg.start,
+      end: currentSeg.end
+    } : null
+  });
 
   // Auto pause between sentences
   useEffect(() => {
@@ -688,12 +838,20 @@ export default function JPVideoSubApp() {
   }
 
   function onJsonFile(e) {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0]; 
+    if (!f) return;
+    
+    console.log('Uploading JSON file:', f.name);
+    
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const obj = JSON.parse(String(reader.result));
-        if (!obj?.segments || !Array.isArray(obj.segments)) throw new Error("JSON không đúng schema (thiếu 'segments').");
+        console.log('Parsed JSON:', obj);
+        
+        if (!obj?.segments || !Array.isArray(obj.segments)) {
+          throw new Error("JSON không đúng schema (thiếu 'segments').");
+        }
         
         // Add Vietnamese translations to existing tokens
         const enhancedObj = {
@@ -707,8 +865,18 @@ export default function JPVideoSubApp() {
           }))
         };
         
-        setData(normalizeData(enhancedObj)); setSimTime(0);
+        console.log('Enhanced JSON:', enhancedObj);
+        setData(normalizeData(enhancedObj)); 
+        setSimTime(0);
+        setDemo(false); // Exit demo mode when loading custom data
+        setPlaying(false); // Stop playing when loading new data
+        
+        // Reset the input so the same file can be selected again
+        e.target.value = '';
+        
+        alert(`Đã tải thành công ${obj.segments.length} segments từ file JSON!`);
       } catch (err) {
+        console.error('JSON parse error:', err);
         alert("Lỗi đọc JSON: " + err.message);
       }
     };
@@ -1351,13 +1519,13 @@ export default function JPVideoSubApp() {
     if (!('MediaRecorder' in window)) { alert('Trình duyệt không hỗ trợ MediaRecorder.'); return; }
     // Determine source: video or image
     const hasVideo = !!videoURL && vid;
-    let width = 1280, height = 720;
+    const selectedSize = VIDEO_SIZES[videoSize];
+    let width = selectedSize.width, height = selectedSize.height;
+    
     if (hasVideo) {
-      width = vid.videoWidth || width;
-      height = vid.videoHeight || height;
-    } else {
-      // fallback size for image (9:16 TikTok style)
-      width = 720; height = 1280;
+      // Use video dimensions if available, otherwise use selected size
+      width = vid.videoWidth || selectedSize.width;
+      height = vid.videoHeight || selectedSize.height;
     }
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
@@ -1436,7 +1604,7 @@ export default function JPVideoSubApp() {
       
       // Use correct file extension based on mimeType
       const extension = mime?.includes('mp4') ? 'mp4' : 'webm';
-      a.download = `video_with_sub_mode_${highlightMode.toLowerCase()}.${extension}`;
+      a.download = `video_${videoSize}_mode_${highlightMode.toLowerCase()}.${extension}`;
       document.body.appendChild(a); a.click();
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
       setRecording(false);
@@ -1835,33 +2003,76 @@ export default function JPVideoSubApp() {
           // Calculate vocabulary panel dimensions - full width like subtitle
           vocabPanelWidth = innerW + outerMargin * 2; // Same width as subtitle panel
           
-          // Calculate vocabulary panel height for horizontal grid - full width
-          const itemWidth = Math.round(120 * scale);
-          const itemHeight = Math.round(80 * scale);
-          const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(8 * scale)));
-          const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+          // Calculate vocabulary panel height for full-width items (one per row)
+          const padForMeasure = Math.max(1, Math.round(4 * scale));
+          const itemWidth = vocabPanelWidth - Math.round(32 * scale);
+          const itemsPerRow = 1;
+          const rows = vocabEntries.length;
           
           // Calculate actual content height needed for each vocabulary item
           const titleHeight = Math.round(30 * scale); // Reduced title height
-          const itemSpacing = Math.round(8 * scale); // Reduced spacing
+          const itemSpacing = Math.max(1, Math.round(4 * scale)); // 4px spacing
           
-          // Calculate dynamic item height based on content length - more compact
-          let maxItemHeight = Math.round(60 * scale); // Reduced base item height
-          
-          // Check if any vocabulary items have long content that needs more space
+          // Calculate dynamic item height based on actual wrapped lines
+          let maxItemHeight = Math.round(60 * scale); // Base item height
+          const itemPaddingCalc = Math.max(1, Math.round(4 * scale));
+          const availableItemWidth = itemWidth - (padForMeasure * 2);
+
+          const wrapLinesCount = (text, lineHeightPx) => {
+            const s = String(text || '');
+            if (!s) return 0;
+            let count = 0;
+            let current = '';
+            // Prefer splitting by spaces, but fall back to characters
+            const chunks = /\s/.test(s) ? s.split(/\s+/) : s.split('');
+            for (let i = 0; i < chunks.length; i++) {
+              const c = chunks[i];
+              const test = current ? (current + (chunks.length === s.length ? '' : ' ') + c) : c;
+              if (ctx.measureText(test).width <= availableItemWidth) {
+                current = test;
+              } else {
+                if (current) count++;
+                // If single chunk too wide, split by characters
+                if (ctx.measureText(c).width > availableItemWidth) {
+                  let part = '';
+                  for (const ch of c) {
+                    const t2 = part + ch;
+                    if (ctx.measureText(t2).width <= availableItemWidth) part = t2; else {
+                      if (part) count++;
+                      part = ch;
+                    }
+                  }
+                  current = part;
+                } else {
+                  current = c;
+                }
+              }
+            }
+            if (current) count++;
+            return count;
+          };
+
+          // Use fonts similar to draw step
+          const jpLineH = Math.round(18 * scale);
+          const readingLineH = Math.round(14 * scale);
+          const viLineH = Math.round(16 * scale);
+
           vocabEntries.forEach(entry => {
-            const jpText = entry.surface || '';
-            const readingText = entry.reading || '';
-            const viText = entry.vi || '';
-            
-            // Estimate text height based on content length - more conservative
-            const jpLines = Math.ceil(jpText.length / 10); // More characters per line
-            const readingLines = Math.ceil(readingText.length / 15); // More characters per line
-            const viLines = Math.ceil(viText.length / 18); // More characters per line
-            
-            const totalLines = Math.max(1, jpLines) + Math.max(1, readingLines) + Math.max(1, viLines);
-            const estimatedHeight = Math.round(15 * scale) + (totalLines * Math.round(8 * scale)) + Math.round(6 * scale); // Reduced padding and line height
-            
+            // Japanese surface (bold)
+            ctx.font = `700 ${Math.round(16 * scale)}px ${fontFamily}`;
+            const jpCount = wrapLinesCount(entry.surface || '', jpLineH);
+
+            // Reading (smaller)
+            ctx.font = `500 ${Math.round(12 * scale)}px ${fontFamily}`;
+            const rdCount = wrapLinesCount(entry.reading || '', readingLineH);
+
+            // Vietnamese meaning (medium)
+            ctx.font = `500 ${Math.round(14 * scale)}px ${fontFamily}`;
+            const viCount = wrapLinesCount(entry.vi || '', viLineH);
+
+            const linesTotal = Math.max(1, jpCount) + Math.max(0, rdCount) + Math.max(1, viCount);
+            const contentH = (jpCount * jpLineH) + (rdCount * readingLineH) + (viCount * viLineH);
+            const estimatedHeight = contentH + (itemPaddingCalc * 2) + Math.round(6 * scale);
             maxItemHeight = Math.max(maxItemHeight, estimatedHeight);
           });
           
@@ -2026,14 +2237,24 @@ export default function JPVideoSubApp() {
       if (highlightMode === 'B' && vocabEntries.length > 0) {
         console.log('Drawing vocabulary panel with', vocabEntries.length, 'entries');
         
-        // Calculate vocabulary items layout
-        const itemWidth = Math.round(120 * scale);
-        const itemHeight = Math.round(80 * scale);
-        const itemsPerRow = Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (itemWidth + Math.round(8 * scale)));
-        const rows = Math.ceil(vocabEntries.length / itemsPerRow);
+        // Calculate vocabulary items layout (full-width or grid)
+        let itemWidth;
+        let itemsPerRow;
+        let rows;
+        if (vocabLayout === 'grid') {
+          const baseItemW = Math.round(120 * scale);
+          const gap4 = Math.round(4 * scale);
+          itemsPerRow = Math.max(1, Math.floor((vocabPanelWidth - Math.round(32 * scale)) / (baseItemW + gap4)));
+          itemWidth = Math.min(baseItemW, Math.floor((vocabPanelWidth - Math.round(32 * scale) - (itemsPerRow - 1) * gap4) / itemsPerRow));
+          rows = Math.ceil(vocabEntries.length / itemsPerRow);
+        } else {
+          itemWidth = vocabPanelWidth - Math.round(32 * scale);
+          itemsPerRow = 1;
+          rows = vocabEntries.length;
+        }
         
         // Calculate dynamic item height based on content length - compact version
-        let maxItemHeight = Math.round(60 * scale); // Reduced base item height
+        let maxItemHeight = Math.round(60 * scale); // Base item height
         vocabEntries.forEach(entry => {
           const jpText = entry.surface || '';
           const readingText = entry.reading || '';
@@ -2058,8 +2279,8 @@ export default function JPVideoSubApp() {
         console.log('Drew test red rectangle at:', vocabPanelX, vocabPanelY, vocabPanelWidth, 50);
         
         // Panel background with margin and padding
-        const margin = Math.round(8 * scale); // Margin around vocabulary content
-        const bottomPadding = Math.round(8 * scale);
+        const margin = Math.max(1, Math.round(4 * scale)); // 4px margin around content
+        const bottomPadding = Math.max(1, Math.round(4 * scale)); // 4px bottom padding
         const backgroundHeight = vocabPanelHeight + bottomPadding + (margin * 2);
         const backgroundY = vocabPanelY - margin;
         
@@ -2079,14 +2300,14 @@ export default function JPVideoSubApp() {
         ctx.textAlign = 'center';
         ctx.font = `700 ${Math.max(14 * scale, subFontSize * scale * 0.9)}px ${fontFamily}`;
         ctx.fillStyle = '#fbbf24';
-        const titleY = vocabPanelY + Math.round(18 * scale) + margin;
+        const titleY = vocabPanelY + Math.round(14 * scale) + margin;
         ctx.fillText(`📚 Từ vựng (${vocabEntries.length})`, vocabPanelX + vocabPanelWidth / 2, titleY);
         console.log('Drew vocab title at:', vocabPanelX + vocabPanelWidth / 2, titleY);
         
         // Vocabulary items - horizontal grid, full width, large text with margin
-        const itemPadding = Math.round(16 * scale);
+        const itemPadding = Math.max(1, Math.round(4 * scale)); // 4px item padding
         
-        const startX = vocabPanelX + itemPadding + margin;
+        const startX = vocabPanelX + margin;
         const startY = titleY + Math.round(20 * scale);
         
         // No height calculations or limits - draw everything
@@ -2105,10 +2326,10 @@ export default function JPVideoSubApp() {
         let skippedCount = 0;
         
         vocabEntries.forEach((entry, idx) => {
-          const row = Math.floor(idx / itemsPerRow);
-          const col = idx % itemsPerRow;
-          const x = startX + col * (itemWidth + Math.round(8 * scale));
-          const y = startY + row * (maxItemHeight + Math.round(8 * scale));
+          const row = vocabLayout === 'grid' ? Math.floor(idx / itemsPerRow) : idx;
+          const col = vocabLayout === 'grid' ? (idx % itemsPerRow) : 0;
+          const x = startX + (vocabLayout === 'grid' ? col * (itemWidth + Math.round(4 * scale)) : 0);
+          const y = startY + row * (maxItemHeight + Math.round(4 * scale));
           
           // Check if item would be outside the allocated vocabulary panel area
           const vocabPanelBottom = vocabPanelY + vocabPanelHeight;
@@ -2144,7 +2365,7 @@ export default function JPVideoSubApp() {
           // Calculate text positions based on dynamic height with proper wrapping - compact
           const textStartY = y + Math.round(15 * scale);
           const lineHeight = Math.round(14 * scale);
-          const itemPadding = Math.round(8 * scale);
+        const itemPadding = Math.max(1, Math.round(4 * scale)); // 4px inner padding
           const availableWidth = itemWidth - (itemPadding * 2);
           
           let currentY = textStartY;
@@ -2424,6 +2645,14 @@ export default function JPVideoSubApp() {
                 <TrendingUp className="icon-4" />
                 <span>Trends</span>
               </button>
+              <button className="btn" onClick={() => setKaraokeOpen(true)}>
+                <BookOpenText className="icon-4" />
+                <span>Karaoke</span>
+              </button>
+              <button className="btn" onClick={() => setVideoSubtitleOpen(true)}>
+                <Play className="icon-4" />
+                <span>Video Subtitle</span>
+              </button>
             </div>
             
             {/* Other */}
@@ -2563,7 +2792,7 @@ export default function JPVideoSubApp() {
 
         {/* Player + Subtitle Panel */}
         <div className="layout">
-          <div className="video-wrapper tiktok" ref={wrapperRef}>
+          <div className={`video-wrapper ${videoSize}`} ref={wrapperRef}>
             {videoURL ? (
               <video ref={videoRef} src={videoURL} controls playsInline loop={!!audioMainURL} muted={!!audioMainURL} onLoadedMetadata={() => { try { setMediaDuration(videoRef.current?.duration || 0); } catch {} }} onPlay={() => {
                 setPlaying(true);
@@ -2577,7 +2806,7 @@ export default function JPVideoSubApp() {
             ) : imageURL ? (
               <img ref={bgImageRef} src={imageURL} alt="bg" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : (
-              <div className="video-placeholder">
+              <div className={`video-placeholder ${videoSize}`}>
                 <div className="placeholder-text">
                   <p className="placeholder-title">Demo Mode (chưa chọn video)</p>
                   <p className="placeholder-desc">Nhấn Play để mô phỏng thời gian, hoặc bấm Upload Video.</p>
@@ -2821,32 +3050,44 @@ export default function JPVideoSubApp() {
                         <div style={{ 
                           display: 'flex',
                           flexWrap: 'wrap',
-                          gap: '0.5rem',
+                          gap: '4px',
                           justifyContent: 'center',
                           alignItems: 'center',
-                          paddingRight: '0.25rem'
+                          padding: '4px',
+                          maxWidth: '100%',
+                          boxSizing: 'border-box'
                         }}>
                           {vocabEntries.map((entry, idx) => (
                             <div key={idx} style={{
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
-                              padding: '0.5rem',
+                              padding: '4px',
                               backgroundColor: 'rgba(39,39,42,0.6)',
                               borderRadius: '0.5rem',
                               border: '1px solid rgba(63,63,70,0.5)',
                               transition: 'all 0.2s ease',
                               cursor: 'pointer',
                               minWidth: '80px',
-                              textAlign: 'center'
+                              maxWidth: '100%',
+                              width: 'auto',
+                              textAlign: 'center',
+                              boxSizing: 'border-box',
+                              overflow: 'hidden',
+                              whiteSpace: 'normal',
+                              wordBreak: 'break-word',
+                              overflowWrap: 'anywhere',
+                              hyphens: 'auto'
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = 'rgba(59,130,246,0.2)';
-                              e.target.style.borderColor = 'rgba(59,130,246,0.5)';
+                              const el = e.currentTarget;
+                              el.style.backgroundColor = 'rgba(59,130,246,0.2)';
+                              el.style.borderColor = 'rgba(59,130,246,0.5)';
                             }}
                             onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'rgba(39,39,42,0.6)';
-                              e.target.style.borderColor = 'rgba(63,63,70,0.5)';
+                              const el = e.currentTarget;
+                              el.style.backgroundColor = 'rgba(39,39,42,0.6)';
+                              el.style.borderColor = 'rgba(63,63,70,0.5)';
                             }}
                             onClick={() => startEditVocab(entry, entry.tokenIndex, entry.segmentIndex)}>
                               {/* Japanese token */}
@@ -2854,7 +3095,9 @@ export default function JPVideoSubApp() {
                                 fontSize: '1rem', 
                                 fontWeight: '600', 
                                 color: '#ffffff',
-                                marginBottom: '0.25rem'
+                                marginBottom: '0.25rem',
+                                wordBreak: 'break-word',
+                                overflowWrap: 'anywhere'
                               }}>
                                 {entry.surface}
                               </div>
@@ -2864,7 +3107,10 @@ export default function JPVideoSubApp() {
                                 <div style={{ 
                                   fontSize: '0.75rem', 
                                   color: '#a1a1aa',
-                                  marginBottom: '0.25rem'
+                                  marginBottom: '0.25rem',
+                                  wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere',
+                                  hyphens: 'auto'
                                 }}>
                                   {entry.reading}
                                 </div>
@@ -2877,10 +3123,12 @@ export default function JPVideoSubApp() {
                                   color: '#10b981',
                                   fontWeight: '500',
                                   backgroundColor: 'rgba(16,185,129,0.1)',
-                                  padding: '0.25rem 0.5rem',
+                                  padding: '4px',
                                   borderRadius: '0.25rem',
                                   textAlign: 'center',
                                   wordBreak: 'break-word',
+                                  overflowWrap: 'anywhere',
+                                  hyphens: 'auto',
                                   maxWidth: '100%'
                                 }}>
                                   {entry.vi}
@@ -2892,7 +3140,8 @@ export default function JPVideoSubApp() {
                                   textAlign: 'center',
                                   lineHeight: '1.2',
                                   fontStyle: 'italic',
-                                  marginTop: '0.1rem'
+                                  marginTop: '0.1rem',
+                                  padding: '4px'
                                 }}>
                                   (chưa có nghĩa)
                                 </div>
@@ -3059,7 +3308,35 @@ export default function JPVideoSubApp() {
         {/* Settings Row - Left Side */}
         {showSettings && (
         <div className="controls-row" style={{ justifyContent: 'flex-start' }}>
+          <div className="controls-left">
+            {!isRecording && (
+              <button className="btn" onClick={startDomRecording} title="Ghi lại khung hiển thị (WebM)">Start Record (WebM)</button>
+            )}
+            {isRecording && (
+              <button className="btn" onClick={stopDomRecording} title="Dừng ghi">Stop Record</button>
+            )}
+            {!isRecording && (
+              <button className="btn" onClick={startScreenRecording} title="Ghi màn hình (WebM)">Screen Record (WebM)</button>
+            )}
+            <button className="btn" onClick={exportVocabPng} title="Chụp ảnh panel từ vựng (PNG)">Export Vocab PNG</button>
+          </div>
           <div className="controls-right" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', alignItems: 'start', maxWidth: '800px' }}>
+            {/* Vocab Layout */}
+            <div style={{ padding: '0.75rem', backgroundColor: 'rgba(39,39,42,0.3)', borderRadius: '0.5rem', border: '1px solid rgba(63,63,70,0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: '600', color: '#e4e4e7', fontSize: '0.875rem' }}>Vocab layout</span>
+              </div>
+              <div className="control-group" style={{ justifyContent: 'space-between' }}>
+                <label className="check-label">
+                  <input type="radio" name="vocabLayout" checked={vocabLayout === 'full'} onChange={() => setVocabLayout('full')} />
+                  <span className="btn-label">Full width</span>
+                </label>
+                <label className="check-label">
+                  <input type="radio" name="vocabLayout" checked={vocabLayout === 'grid'} onChange={() => setVocabLayout('grid')} />
+                  <span className="btn-label">Fit grid</span>
+                </label>
+              </div>
+            </div>
             {/* Audio Controls */}
             <div style={{ 
               padding: '0.75rem', 
@@ -3116,6 +3393,46 @@ export default function JPVideoSubApp() {
                 <span style={{ fontWeight: '600', color: '#e4e4e7', fontSize: '0.875rem' }}>Display</span>
               </div>
               <div style={{ display: 'grid', gap: '0.5rem' }}>
+                {/* Important Options - Moved to top */}
+                <label className="check-label">
+                  <input type="checkbox" checked={showRomaji} onChange={(e) => setShowRomaji(e.target.checked)} />
+                  <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Languages className="icon-4" /> Romaji</span>
+                </label>
+                <label className="check-label">
+                  <input type="checkbox" checked={showVietnamese} onChange={(e) => setShowVietnamese(e.target.checked)} />
+                  <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Wand2 className="icon-4" /> Tiếng Việt</span>
+                </label>
+                <div className="control-group">
+                  <span className="btn-label">Ngôn ngữ hiển thị</span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <label className="check-label">
+                      <input type="radio" name="languageMode" value="vi" checked={languageMode === 'vi'} onChange={(e) => setLanguageMode(e.target.value)} />
+                      <span className="btn-label">Tiếng Việt</span>
+                    </label>
+                    <label className="check-label">
+                      <input type="radio" name="languageMode" value="en" checked={languageMode === 'en'} onChange={(e) => setLanguageMode(e.target.value)} />
+                      <span className="btn-label">English</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="control-group">
+                  <span className="btn-label">Kích thước video</span>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <label className="check-label">
+                      <input type="radio" name="videoSize" value="youtube" checked={videoSize === 'youtube'} onChange={(e) => setVideoSize(e.target.value)} />
+                      <span className="btn-label">YouTube (16:9)</span>
+                    </label>
+                    <label className="check-label">
+                      <input type="radio" name="videoSize" value="tiktok" checked={videoSize === 'tiktok'} onChange={(e) => setVideoSize(e.target.value)} />
+                      <span className="btn-label">TikTok (9:16)</span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Separator */}
+                <div style={{ height: '1px', backgroundColor: 'rgba(63,63,70,0.3)', margin: '0.5rem 0' }}></div>
+                
+                {/* Other Display Options */}
                 <div className="control-group">
                   <span className="btn-label">Độ mờ nền</span>
                   <input type="range" min={0.4} max={1} step={0.02} value={opacity} onChange={(e) => setOpacity(parseFloat(e.target.value))} className="slider" />
@@ -3289,28 +3606,7 @@ export default function JPVideoSubApp() {
             <label className="check-label">
               <input type="checkbox" checked={showFurigana} onChange={(e) => setShowFurigana(e.target.checked)} />
               <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Type className="icon-4" /> Furigana</span>
-            </label>
-            <label className="check-label">
-              <input type="checkbox" checked={showRomaji} onChange={(e) => setShowRomaji(e.target.checked)} />
-              <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Languages className="icon-4" /> Romaji</span>
-            </label>
-            <label className="check-label">
-              <input type="checkbox" checked={showVietnamese} onChange={(e) => setShowVietnamese(e.target.checked)} />
-              <span className="btn-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Wand2 className="icon-4" /> Tiếng Việt</span>
-            </label>
-            <div className="control-group">
-              <span className="btn-label">Ngôn ngữ hiển thị</span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <label className="check-label">
-                  <input type="radio" name="languageMode" value="vi" checked={languageMode === 'vi'} onChange={(e) => setLanguageMode(e.target.value)} />
-                  <span className="btn-label">Tiếng Việt</span>
-                </label>
-                <label className="check-label">
-                  <input type="radio" name="languageMode" value="en" checked={languageMode === 'en'} onChange={(e) => setLanguageMode(e.target.value)} />
-                  <span className="btn-label">English</span>
-                </label>
-              </div>
-            </div>
+            </label>thr
             <label className="check-label">
               <input type="checkbox" checked={subCentered} onChange={(e) => setSubCentered(e.target.checked)} />
               <span className="btn-label">Sub giữa màn hình</span>
@@ -3446,6 +3742,102 @@ export default function JPVideoSubApp() {
       
       {/* Trends Tool */}
       <TrendsToolSimple isOpen={trendsOpen} onClose={() => setTrendsOpen(false)} />
+      
+      {/* Karaoke Page */}
+      {karaokeOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1f2937',
+            borderRadius: '0.5rem',
+            width: '100%',
+            maxWidth: '1200px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setKaraokeOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'rgba(0,0,0,0.5)',
+                border: 'none',
+                color: 'white',
+                fontSize: '1.5rem',
+                width: '2rem',
+                height: '2rem',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                zIndex: 1001
+              }}
+            >
+              ×
+            </button>
+            <KaraokePage />
+          </div>
+        </div>
+      )}
+
+      {/* Video Subtitle Page */}
+      {videoSubtitleOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            backgroundColor: '#1f2937',
+            borderRadius: '0.5rem',
+            width: '100%',
+            maxWidth: '1400px',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setVideoSubtitleOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'rgba(0,0,0,0.5)',
+                border: 'none',
+                color: 'white',
+                fontSize: '1.5rem',
+                width: '2rem',
+                height: '2rem',
+                borderRadius: '50%',
+                cursor: 'pointer',
+                zIndex: 1001
+              }}
+            >
+              ×
+            </button>
+            <VideoSubtitlePage />
+          </div>
+        </div>
+      )}
       
       {/* Vocabulary Edit Modal */}
       {editingVocab && (

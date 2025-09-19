@@ -1,0 +1,66 @@
+{
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 8.0,
+      "jp": "こんにちは、元気ですか？今日は天気がいいですね。",
+      "vi": "Xin chào, bạn có khỏe không? Hôm nay thời tiết đẹp nhỉ.",
+      "en": "Hello, how are you? The weather is nice today.",
+      "tokens": [
+        { "surface": "こんにちは", "reading": "こんにちは", "romaji": "konnichiwa", "pos": "EXPR", "vi": "xin chào", "en": "hello", "t": 0.2, "end": 1.5 },
+        { "surface": "、", "reading": "、", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 1.5, "end": 1.7 },
+        { "surface": "元気", "reading": "げんき", "romaji": "genki", "pos": "NOUN", "vi": "khỏe mạnh", "en": "healthy", "t": 1.7, "end": 2.3 },
+        { "surface": "です", "reading": "です", "romaji": "desu", "pos": "AUX", "vi": "là", "en": "is", "t": 2.3, "end": 2.7 },
+        { "surface": "か", "reading": "か", "romaji": "ka", "pos": "PARTICLE", "vi": "không", "en": "question", "t": 2.7, "end": 3.0 },
+        { "surface": "？", "reading": "？", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 3.0, "end": 3.5 },
+        { "surface": "今日", "reading": "きょう", "romaji": "kyou", "pos": "NOUN", "vi": "hôm nay", "en": "today", "t": 3.5, "end": 4.0 },
+        { "surface": "は", "reading": "は", "romaji": "wa", "pos": "PARTICLE", "vi": "thì", "en": "topic", "t": 4.0, "end": 4.2 },
+        { "surface": "天気", "reading": "てんき", "romaji": "tenki", "pos": "NOUN", "vi": "thời tiết", "en": "weather", "t": 4.2, "end": 4.8 },
+        { "surface": "が", "reading": "が", "romaji": "ga", "pos": "PARTICLE", "vi": "", "en": "subject", "t": 4.8, "end": 5.0 },
+        { "surface": "いい", "reading": "いい", "romaji": "ii", "pos": "ADJ", "vi": "đẹp", "en": "good", "t": 5.0, "end": 5.5 },
+        { "surface": "です", "reading": "です", "romaji": "desu", "pos": "AUX", "vi": "là", "en": "is", "t": 5.5, "end": 6.0 },
+        { "surface": "ね", "reading": "ね", "romaji": "ne", "pos": "PARTICLE", "vi": "nhỉ", "en": "right", "t": 6.0, "end": 6.3 },
+        { "surface": "。", "reading": "。", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 6.3, "end": 8.0 }
+      ]
+    },
+    {
+      "start": 8.0,
+      "end": 16.0,
+      "jp": "先週の夜、寮の自分の部屋で勉強していました。",
+      "vi": "Tối tuần trước, tôi đã học bài trong phòng riêng ở ký túc xá.",
+      "en": "Last week at night, I was studying in my own room at the dormitory.",
+      "tokens": [
+        { "surface": "先週", "reading": "せんしゅう", "romaji": "senshuu", "pos": "NOUN", "vi": "tuần trước", "en": "last week", "t": 0.2, "end": 0.8 },
+        { "surface": "の", "reading": "の", "romaji": "no", "pos": "PARTICLE", "vi": "của", "en": "of", "t": 0.8, "end": 1.0 },
+        { "surface": "夜", "reading": "よる", "romaji": "yoru", "pos": "NOUN", "vi": "tối", "en": "night", "t": 1.0, "end": 1.5 },
+        { "surface": "、", "reading": "、", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 1.5, "end": 1.7 },
+        { "surface": "寮", "reading": "りょう", "romaji": "ryou", "pos": "NOUN", "vi": "ký túc xá", "en": "dormitory", "t": 1.7, "end": 2.2 },
+        { "surface": "の", "reading": "の", "romaji": "no", "pos": "PARTICLE", "vi": "của", "en": "of", "t": 2.2, "end": 2.4 },
+        { "surface": "自分", "reading": "じぶん", "romaji": "jibun", "pos": "NOUN", "vi": "bản thân", "en": "self", "t": 2.4, "end": 2.8 },
+        { "surface": "の", "reading": "の", "romaji": "no", "pos": "PARTICLE", "vi": "của", "en": "of", "t": 2.8, "end": 3.0 },
+        { "surface": "部屋", "reading": "へや", "romaji": "heya", "pos": "NOUN", "vi": "phòng", "en": "room", "t": 3.0, "end": 3.5 },
+        { "surface": "で", "reading": "で", "romaji": "de", "pos": "PARTICLE", "vi": "ở", "en": "at", "t": 3.5, "end": 3.7 },
+        { "surface": "勉強", "reading": "べんきょう", "romaji": "benkyou", "pos": "NOUN", "vi": "học bài", "en": "study", "t": 3.7, "end": 4.5 },
+        { "surface": "して", "reading": "して", "romaji": "shite", "pos": "VERB", "vi": "đang", "en": "doing", "t": 4.5, "end": 5.0 },
+        { "surface": "いました", "reading": "いました", "romaji": "imashita", "pos": "AUX", "vi": "đã", "en": "was", "t": 5.0, "end": 5.8 },
+        { "surface": "。", "reading": "。", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 5.8, "end": 8.0 }
+      ]
+    },
+    {
+      "start": 16.0,
+      "end": 24.0,
+      "jp": "日本語の勉強は楽しいです。",
+      "vi": "Việc học tiếng Nhật rất thú vị.",
+      "en": "Studying Japanese is fun.",
+      "tokens": [
+        { "surface": "日本語", "reading": "にほんご", "romaji": "nihongo", "pos": "NOUN", "vi": "tiếng Nhật", "en": "Japanese", "t": 0.2, "end": 1.0 },
+        { "surface": "の", "reading": "の", "romaji": "no", "pos": "PARTICLE", "vi": "của", "en": "of", "t": 1.0, "end": 1.2 },
+        { "surface": "勉強", "reading": "べんきょう", "romaji": "benkyou", "pos": "NOUN", "vi": "việc học", "en": "study", "t": 1.2, "end": 2.0 },
+        { "surface": "は", "reading": "は", "romaji": "wa", "pos": "PARTICLE", "vi": "thì", "en": "topic", "t": 2.0, "end": 2.2 },
+        { "surface": "楽しい", "reading": "たのしい", "romaji": "tanoshii", "pos": "ADJ", "vi": "thú vị", "en": "fun", "t": 2.2, "end": 3.0 },
+        { "surface": "です", "reading": "です", "romaji": "desu", "pos": "AUX", "vi": "là", "en": "is", "t": 3.0, "end": 3.5 },
+        { "surface": "。", "reading": "。", "romaji": "", "pos": "PUNCT", "vi": "", "en": "", "t": 3.5, "end": 8.0 }
+      ]
+    }
+  ]
+}
